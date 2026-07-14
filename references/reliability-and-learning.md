@@ -18,6 +18,7 @@ The July 11, 2026 local evidence showed the implicit/default model path emitting
 
 | Class | Evidence | Recovery |
 |---|---|---|
+| `onboarding` | first-run theme or onboarding screen is visible | stop unattended execution and require the user to complete it in an attended TUI |
 | `adapter_empty` | empty/unusable stdout plus repeated `PlannerResponse without ModifiedResponse` | explicitly smoke-test the configured Gemini 3.5 tier, then another 3.5 tier if needed |
 | `quota` | `Resource has been exhausted` or quota error | choose another healthy Gemini 3.5 tier or stop |
 | `capacity` | 503, high traffic, or `No capacity available` | one delayed retry or another healthy Gemini 3.5 tier |
@@ -47,6 +48,8 @@ The classifier appends redacted JSON Lines to `evals/runtime-observations.jsonl`
 - whether stdout was non-empty;
 - short evidence markers, never raw prompts, URLs with secrets, tokens, emails, or full logs.
 - a content-derived run fingerprint used only to deduplicate repeated classification of the same run.
+
+For foreground automation, require the real process exit code. For a bounded work order completed inside a persistent Herdr TUI, capture only that work order's redacted terminal segment and use `--verified-interactive` after the handoff and independent verification both pass. This records `exit_code: null`. Never classify a whole reused-session log as one job, and never fabricate exit `0` merely because Herdr reports `idle`.
 
 Re-classifying the same log must not create another incident. Promotion counts unique fingerprints, distinct AGY conversations/runs, and at least two task contexts; repeated retries or repeated classifier calls against one log count once.
 

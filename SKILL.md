@@ -1,6 +1,6 @@
 ---
 name: use-agy
-description: Plan, delegate, coordinate, monitor, and verify work performed by Google Antigravity CLI (`agy`). Use whenever the user mentions agy or Antigravity CLI, asks the agent to act as planner/supervisor while AGY executes, wants an independent local worker for implementation/debugging/research, or needs intelligent selection among foreground execution, tmux, interactive TUI, sandboxing, conversations, and isolated worktrees. The supervising agent must adapt the execution topology to task duration, risk, interactivity, concurrency, and verification needs rather than blindly invoking AGY.
+description: Plan, delegate, coordinate, monitor, and verify work performed by Google Antigravity CLI (`agy`). Use whenever the user mentions agy or Antigravity CLI, asks the agent to act as planner/supervisor while AGY executes, wants an independent local worker for implementation/debugging/research, or needs intelligent selection among foreground execution, Herdr sessions, interactive TUI, sandboxing, conversations, and isolated worktrees. The supervising agent must adapt the execution topology to task duration, risk, interactivity, concurrency, and verification needs rather than blindly invoking AGY.
 ---
 
 # Use AGY
@@ -16,11 +16,12 @@ understand -> plan -> select worker/runtime -> issue work order
 -> observe -> steer/recover -> verify -> integrate -> report
 ```
 
-AGY performs bounded work; the supervisor remains accountable for the outcome. `tmux`, TUI, sandbox, conversations, subagents, and worktrees are execution mechanisms selected by judgment, never goals or defaults.
+AGY performs bounded work; the supervisor remains accountable for the outcome. Herdr, TUI, sandbox, conversations, subagents, and worktrees are execution mechanisms selected by judgment, never goals or defaults.
 
 Read only the references needed:
 
-- Read [references/orchestration.md](references/orchestration.md) to decompose tasks, choose direct/tmux/TUI/worktree execution, monitor workers, and recover failures.
+- Read [references/orchestration.md](references/orchestration.md) to decompose tasks, choose foreground/Herdr/TUI/worktree execution, monitor workers, and recover failures.
+- Read [references/herdr-runtime.md](references/herdr-runtime.md) before launching, observing, steering, or cleaning up an AGY session in Herdr.
 - Read [references/work-orders.md](references/work-orders.md) to construct prompts, deliverables, acceptance contracts, and retries.
 - Read [references/agy-cli.md](references/agy-cli.md) when exact CLI flags, conversations, models, agents, or version behavior matters.
 - Read [references/security-and-permissions.md](references/security-and-permissions.md) before writes, commands, network, MCP, non-workspace access, or secrets-adjacent work.
@@ -29,7 +30,7 @@ Read only the references needed:
 ## Supervisor Rules
 
 1. Understand the user's real outcome and definition of done before delegating.
-2. Choose the simplest adequate execution topology. Default to foreground one-shot; earn tmux, TUI, parallelism, and worktrees through task needs.
+2. Choose the simplest adequate execution topology. Default to foreground one-shot; earn Herdr, TUI, parallelism, and worktrees through task needs.
 3. Do not delegate a task merely because AGY exists. Use direct tools when work is trivial, latency-sensitive, unsafe to delegate, or easier to verify directly.
 4. Give each AGY invocation one bounded job with explicit authority and evidence-based acceptance checks.
 5. Separate discovery from mutation when uncertainty or blast radius is meaningful: `EXPLORE/DIAGNOSE -> supervisor review -> EXECUTE -> VERIFY`.
@@ -37,7 +38,7 @@ Read only the references needed:
 7. Monitor every live worker. Detect objective drift, permission waits, stalls, timeout, scope violations, and conflicting edits early.
 8. Never treat AGY's handoff as proof. Independently inspect evidence, diffs, commands, tests, and sources.
 9. Keep user changes intact. Never revert unrelated modifications or silently integrate questionable worker output.
-10. Do not report completion while required AGY commands or tmux sessions remain unobserved, running, or waiting for approval.
+10. Do not report completion while required AGY commands or Herdr sessions remain unobserved, working, or waiting for approval.
 11. Never rely on AGY's implicit default model. Use only an explicitly named Gemini 3.5 model. Never invoke GPT, Claude, Gemini 3.1, or another model family through this skill.
 12. Every automated invocation must use a unique `--log-file`; classify failures from exit code, stdout, and log evidence before retrying.
 
@@ -71,11 +72,11 @@ Choose runtime from task characteristics, not habit. Read [references/orchestrat
 | Need | Preferred topology |
 |---|---|
 | Short bounded job, immediate result | foreground `agy -p` |
-| Long non-interactive job, disconnect risk | detached tmux + persistent log |
-| Permission/review/course-correction expected | attended TUI, optionally inside tmux |
+| Long job, live progress, or disconnect risk | attended AGY TUI in Herdr + persistent log |
+| Permission/review/course-correction expected | attended AGY TUI in Herdr |
 | Concurrent read-only jobs | separate calls; parallel only when useful |
 | Concurrent writing jobs | separate worktrees + separate sessions/logs |
-| CI/script requiring exit status | foreground process, not tmux |
+| CI/script requiring direct exit status | foreground process, not Herdr |
 
 ## 3. Establish The Control Envelope
 
@@ -130,16 +131,18 @@ agy --model '<HEALTHY_MODEL>' -p '<WORK_ORDER>' --mode accept-edits --sandbox \
   --print-timeout 15m --log-file '<UNIQUE_LOG>'
 ```
 
-Put the prompt immediately after `-p`. Adjust mode, sandbox, timeout, conversation, tmux, and worktree according to the selected topology.
+Put the prompt immediately after `-p`. Adjust mode, sandbox, timeout, conversation, Herdr session, and worktree according to the selected topology.
 
 ## 6. Observe And Steer
 
 Stay responsible while AGY runs:
 
-- Foreground: consume incremental output and wait for process completion.
-- tmux: capture pane/log, detect approval waits, and preserve exit status.
-- TUI: review plans, artifacts, permissions, and course-correct early.
+- Foreground: capture stdout, stderr, log, and the final process exit status.
+- Herdr: capture a workspace baseline before each bounded work order, inspect semantic state plus the real terminal, detect approval waits, and retain the session until verification finishes.
+- TUI: review plans, artifacts, permissions, and course-correct early; do not treat visible `done` or `idle` as verification.
 - Parallel workers: track ownership and dependencies; prevent shared-write conflicts.
+
+When reusing an idle Herdr TUI, deliver the next bounded work order through its resolved pane, observe evidence that the new prompt was accepted, then require a new `working` transition before waiting for `idle`. If `working` was too brief to observe, inspect newly appended terminal output instead of resending the prompt. Compare the post-job workspace to the per-job baseline before accepting claims about file changes.
 
 Intervene when AGY drifts, stalls, exceeds scope, requests new authority, edits unexpected files, or reports unverifiable success. Stop unsafe work immediately. Use one concise corrective retry for a malformed handoff or objective drift; do not loop indefinitely.
 
@@ -163,7 +166,7 @@ Inspect worker output before accepting it:
 
 Integrate only accepted output. Clean up temporary sessions/worktrees after preserving evidence and confirming no required process remains.
 
-After every AGY run, record a redacted observation with `scripts/classify_run.py --record`. Promote a workaround into this skill only after the evidence threshold in [references/reliability-and-learning.md](references/reliability-and-learning.md) is met. A single incident may change the current job's routing, but must not rewrite permanent policy.
+After every AGY run, record a redacted observation with `scripts/classify_run.py --record`. In a persistent Herdr TUI, treat each bounded work order as a run and use `--verified-interactive` only after a complete handoff and independent verification; do not invent a process exit code. Promote a workaround into this skill only after the evidence threshold in [references/reliability-and-learning.md](references/reliability-and-learning.md) is met. A single incident may change the current job's routing, but must not rewrite permanent policy.
 
 ## 8. Report
 

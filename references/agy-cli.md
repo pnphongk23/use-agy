@@ -4,7 +4,7 @@ Use this reference to select supported CLI behavior. Prefer the installed binary
 
 ## Sources Checked
 
-- Local `agy --help`, `agy agents`, `agy models`, and `agy changelog` on 2026-07-11.
+- Local AGY 1.1.2: `agy --version`, `agy --help`, `agy agents`, `agy models`, and `agy changelog` on 2026-07-14.
 - Built-in guide: `~/.gemini/antigravity-cli/builtin/skills/antigravity_guide/`.
 - Official docs: `https://antigravity.google/docs/cli-overview`, `/cli-using`, `/cli-best-practices`, `/cli-prompting`, `/cli-reference`, `/cli-conversations`, `/cli-subagents`, `/cli-permissions`, and `/cli-sandbox`.
 
@@ -62,6 +62,8 @@ Community examples often omit `--mode` because they rely on configured defaults 
 Set `--print-timeout` above five minutes for builds or broad research.
 
 Use `--prompt-interactive` only for a human-attended TUI session. First launch may show theme, sign-in, terms, telemetry, and privacy choices. Never complete those choices for the user.
+
+For long-running or interaction-prone work, launch that TUI through Herdr as described in [herdr-runtime.md](herdr-runtime.md). Herdr preserves and exposes the real terminal but does not change AGY permissions, sandboxing, model selection, or the requirement for independent verification.
 
 Use `--continue` only for the latest conversation in the current working directory. Conversations are directory-scoped. Use `--conversation <id>` when an exact session is required. Fresh one-shot calls reduce context contamination.
 

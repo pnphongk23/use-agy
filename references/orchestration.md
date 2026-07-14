@@ -7,7 +7,7 @@ Use this reference to turn a user goal into a supervised execution strategy. Opt
 - Delegation decision
 - Task decomposition
 - Runtime selection
-- Tmux lifecycle
+- Herdr lifecycle
 - Concurrency and worktrees
 - Monitoring and intervention
 - Completion protocol
@@ -75,20 +75,20 @@ Use when:
 
 Benefits: simplest, observable, easy error propagation, easy cleanup.
 
-### Detached tmux one-shot
+### Herdr-managed AGY TUI
 
 Use when:
 
-- work is long-running or may outlive the current terminal;
+- work is long-running, benefits from live progress, or may outlive the current terminal;
 - SSH/disconnect risk matters;
-- the supervisor can poll pane/log output;
-- the job should continue without continuous interaction.
+- the supervisor needs to inspect or attach to the real AGY terminal;
+- permission, review, or course correction may be needed.
 
-Require: unique session name, correct working directory, persistent log, captured exit marker, monitoring plan, and cleanup owner.
+Require: installed compatible Herdr, unique agent name, correct working directory, persistent AGY log, monitoring plan, and cleanup owner.
 
-Do not use merely because tmux is installed. Avoid for short jobs, CI, structured-output pipelines, or jobs likely to block on approval.
+Do not use merely because Herdr is installed. Avoid for short jobs, CI, and structured-output pipelines that require a direct process exit status.
 
-### Attended TUI, optionally in tmux
+### Attended TUI in Herdr
 
 Use when:
 
@@ -103,33 +103,37 @@ Do not automate onboarding, consent, login, telemetry, or privacy choices.
 
 Start fresh for isolated reproducible work. Use `--continue` only when latest directory-scoped context is intentional. Use `--conversation <id>` for an exact prior thread. Avoid resuming stale context for unrelated work.
 
-## Tmux Lifecycle
+## Herdr Lifecycle
 
-Treat tmux as a process supervisor, not a quality mechanism.
+Treat Herdr as a persistent terminal and control surface, not a quality mechanism. Read [herdr-runtime.md](herdr-runtime.md) before operating a session.
 
 Before launch:
 
-1. Choose a collision-resistant name such as `agy-<job>-<slug>`.
-2. Confirm no existing session owns that name.
+1. Confirm the Herdr client/server versions are compatible.
+2. Choose a collision-resistant agent name such as `agy-<job>-<slug>` and confirm it is unused.
 3. Set the intended workspace/worktree as session working directory.
 4. Choose a log path that contains no secrets.
 5. Define timeout, poll method, approval strategy, and cleanup owner.
 
 During execution:
 
-1. Poll `tmux capture-pane` or persistent logs.
-2. Detect no-output stalls, repeated loops, permission prompts, and objective drift.
-3. Attach only when interaction is required; otherwise preserve reproducibility.
-4. Stop the worker when behavior becomes unsafe or out of scope.
+1. Capture a fresh workspace baseline immediately before every bounded work order, including follow-ups in a reused session.
+2. Poll `herdr agent get`, `herdr agent read`, and the persistent AGY log.
+3. For a reused idle TUI, confirm prompt acceptance and observe `working` before waiting for a new `idle`; inspect appended terminal output when a brief transition is missed.
+4. Use `herdr agent explain` when screen-derived state conflicts with the visible terminal.
+5. Treat `working`, `blocked`, `idle`, and `done` as attention hints, not proof of task success or process exit.
+6. Attach only when interaction is required; never auto-approve login, consent, or expanded permissions.
+7. Stop the worker when behavior becomes unsafe or out of scope.
 
 At completion:
 
-1. Capture final output and actual exit status.
-2. Confirm the AGY process is no longer running.
-3. Independently inspect workspace changes and run acceptance checks.
-4. Preserve useful logs, then remove the session when no longer needed.
+1. Capture the final terminal output, AGY log, handoff, and process state.
+2. Compare against the baseline for that exact work order, independently inspect workspace changes, and run acceptance checks.
+3. Record a redacted per-work-order observation; use a verified-interactive record when the TUI remains alive instead of fabricating an exit code.
+4. Close the pane only after evidence is preserved and no interaction remains necessary.
+5. Confirm the agent no longer appears in `herdr agent list`; stop a temporary Herdr server if this workflow started it.
 
-Remember: tmux persistence does not override AGY's `--print-timeout`.
+Remember: Herdr screen detection for AGY is heuristic. A visible `idle` or `done` state never replaces the handoff and independent verification.
 
 ## Concurrency And Worktrees
 
@@ -139,7 +143,7 @@ Parallel writing workers must use isolated worktrees or separate checkouts. Assi
 
 - disjoint file ownership;
 - unique branch/worktree;
-- unique tmux session and log;
+- unique Herdr agent and log;
 - independent acceptance contract;
 - explicit integration order.
 
@@ -184,7 +188,7 @@ The supervisor may report completion only when:
 
 - every required dependency is resolved;
 - every worker is done, failed and handled, or intentionally stopped;
-- no required foreground process or tmux session remains unobserved;
+- no required foreground process or Herdr session remains unobserved;
 - changed files and sources have been independently inspected;
 - acceptance checks have been rerun or inability is disclosed;
 - temporary worktrees/sessions have an explicit retained-or-cleaned state;

@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 PATTERNS = [
+    ("onboarding", ("choose your color scheme", "choose your theme")),
     ("quota", ("resource has been exhausted", "quota exceeded")),
     ("capacity", ("no capacity available", "high traffic", "code 503", "unavailable")),
     ("sandbox", ("sandbox_command_blocked", "operation not permitted")),
@@ -21,7 +22,12 @@ PATTERNS = [
 ]
 
 
-def classify(log_text: str, stdout: str, exit_code: int) -> tuple[str, list[str]]:
+def classify(
+    log_text: str,
+    stdout: str,
+    exit_code: int | None,
+    verified_interactive: bool = False,
+) -> tuple[str, list[str]]:
     text = f"{log_text}\n{stdout}".lower()
     for name, needles in PATTERNS:
         hits = [needle for needle in needles if needle in text]
@@ -31,6 +37,8 @@ def classify(log_text: str, stdout: str, exit_code: int) -> tuple[str, list[str]
             if name == "adapter_empty" and stdout.strip():
                 continue
             return name, hits[:3]
+    if verified_interactive and stdout.strip():
+        return "success", []
     if exit_code == 0 and stdout.strip():
         return "success", []
     if exit_code == 0:
@@ -42,7 +50,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", required=True)
     parser.add_argument("--stdout-file")
-    parser.add_argument("--exit-code", required=True, type=int)
+    parser.add_argument("--exit-code", type=int)
+    parser.add_argument(
+        "--verified-interactive",
+        action="store_true",
+        help="Record a supervisor-verified bounded job in a still-running interactive TUI.",
+    )
     parser.add_argument("--model", default="unknown")
     parser.add_argument("--job", default="unknown")
     parser.add_argument("--elapsed-seconds", type=float)
@@ -53,11 +66,23 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    if args.verified_interactive and args.exit_code is not None:
+        parser.error("--verified-interactive cannot be combined with --exit-code")
+    if not args.verified_interactive and args.exit_code is None:
+        parser.error("--exit-code is required unless --verified-interactive is used")
+
     log_text = Path(args.log).read_text(errors="replace") if Path(args.log).exists() else ""
     stdout = ""
     if args.stdout_file and Path(args.stdout_file).exists():
         stdout = Path(args.stdout_file).read_text(errors="replace")
-    result, markers = classify(log_text, stdout, args.exit_code)
+    if args.verified_interactive and not stdout.strip():
+        parser.error("--verified-interactive requires a non-empty --stdout-file")
+    result, markers = classify(
+        log_text,
+        stdout,
+        args.exit_code,
+        verified_interactive=args.verified_interactive,
+    )
     fingerprint_input = "\0".join(
         (args.model, args.job, str(args.exit_code), log_text, stdout)
     ).encode("utf-8", errors="replace")
