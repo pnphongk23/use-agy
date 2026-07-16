@@ -4,7 +4,7 @@ Use this reference to select supported CLI behavior. Prefer the installed binary
 
 ## Sources Checked
 
-- Local AGY 1.1.2: `agy --version`, `agy --help`, `agy agents`, `agy models`, and `agy changelog` on 2026-07-14.
+- Local AGY 1.1.2: `agy --version`, `agy --help`, `agy agents`, `agy models`, permission probes, and `agy changelog` checked through 2026-07-16.
 - Built-in guide: `~/.gemini/antigravity-cli/builtin/skills/antigravity_guide/`.
 - Official docs: `https://antigravity.google/docs/cli-overview`, `/cli-using`, `/cli-best-practices`, `/cli-prompting`, `/cli-reference`, `/cli-conversations`, `/cli-subagents`, `/cli-permissions`, and `/cli-sandbox`.
 
@@ -36,16 +36,18 @@ Subcommands: `agent`, `agents`, `changelog`, `help`, `install`, `models`, `plugi
 
 The local CLI currently lists one named agent, `mcp-manager`. Never assume a role name exists; run `agy agents` before `--agent <name>`. Run `agy models` before selecting a model.
 
-The current local help does not expose `--cwd`, although an official best-practices example uses it. Run AGY with the process working directory set to the workspace instead of passing undocumented flags.
+The current local help does not expose `--cwd`, although an official best-practices example uses it. Process `cwd` alone did not bind print mode to the repository in a local probe: AGY used its scratch directory under an empty `CLI Project`. Pass `--add-dir '<WORKSPACE>'` and name the same path as the command working directory in the work order.
 
 ## Invocation Selection
 
 Within this skill, the default is `--prompt-interactive` in a Herdr-managed TUI. Use `--print` or `-p` only when direct process exit status or structured stdout is essential, the user explicitly requests it, Herdr is unavailable/incompatible, or the job is exceptionally small and latency-sensitive. Put the prompt immediately after the flag, then append other options:
 
 ```bash
-agy --model 'Gemini 3.5 Flash (Medium)' -p '<WORK_ORDER>' \
-  --mode plan --sandbox --print-timeout 10m --log-file '<UNIQUE_LOG>'
+agy --model 'Gemini 3.5 Flash (Medium)' --add-dir '<WORKSPACE>' -p '<WORK_ORDER>' \
+  --mode plan --print-timeout 10m --log-file '<UNIQUE_LOG>'
 ```
+
+Add `--sandbox` only after checking that containment preserves the requested behavior. Local AGY 1.1.2 on macOS hides `.git`, so `git status` and `git diff` fail inside the sandbox. Keep those checks supervisor-owned when possible.
 
 ## What `--mode` Means
 
@@ -59,6 +61,10 @@ The installed CLI accepts `--mode plan` and `--mode accept-edits`.
 
 Community examples often omit `--mode` because they rely on configured defaults or use `--dangerously-skip-permissions` for autonomous execution. This skill intentionally does not copy that behavior. Keep `plan` for bounded non-mutating jobs unless a verified installed-CLI bug requires omission.
 
+In headless `-p` mode, an operation that requires `ask` cannot prompt. Current behavior soft-denies the tool and may still return process exit `0` with a notice such as `a tool required the "command" permission that headless mode cannot prompt for`. Classify that notice as `permission`, not success. Use an attended TUI only when the user is available to decide the requested risky action.
+
+Although official docs specify `deny > ask > allow`, local AGY 1.1.2 allowed `git commit --dry-run` when `command(*)` and `command(git commit)` overlapped. Do not use `command(*)` as the low-friction default on this version. Use exact routine-command grants and audit the shared/project permission sources for stale risky allows.
+
 Set `--print-timeout` above five minutes for builds or broad research.
 
 Use `--prompt-interactive` only for a human-attended TUI session. First launch may show theme, sign-in, terms, telemetry, and privacy choices. Never complete those choices for the user.
@@ -67,7 +73,7 @@ For delegated work, launch that TUI through Herdr by default as described in [he
 
 Use `--continue` only for the latest conversation in the current working directory. Conversations are directory-scoped. Use `--conversation <id>` when an exact session is required. Fresh one-shot calls reduce context contamination.
 
-Use `--project <id>` for an existing project and `--add-dir <path>` for approved multi-root context. Do not invent project IDs or add unrelated directories.
+Use `--project <id>` for an existing project. Use `--add-dir <path>` to bind each named approved workspace root, including the primary root when print mode would otherwise resolve to the empty `CLI Project`. Do not invent project IDs or add unrelated directories.
 
 ## TUI Capabilities
 

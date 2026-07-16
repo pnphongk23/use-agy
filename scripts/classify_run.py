@@ -11,11 +11,26 @@ from pathlib import Path
 
 
 PATTERNS = [
+    (
+        "unsafe_permission_allow",
+        ("risk_unexpectedly_allowed", "rm_unexpectedly_allowed"),
+    ),
     ("onboarding", ("choose your color scheme", "choose your theme")),
     ("quota", ("resource has been exhausted", "quota exceeded")),
     ("capacity", ("no capacity available", "high traffic", "code 503", "unavailable")),
     ("sandbox", ("sandbox_command_blocked", "operation not permitted")),
-    ("permission", ("permission denied", "waiting for approval", "permission request")),
+    ("workspace", ("inside the scratch directory", "not a git repository")),
+    (
+        "permission",
+        (
+            "permission denied",
+            "waiting for approval",
+            "permission request",
+            "headless mode cannot prompt",
+            "auto-denied",
+            "required the \"command\" permission",
+        ),
+    ),
     ("auth", ("not authenticated", "authentication required", "please log in")),
     ("adapter_empty", ("plannerresponse without modifiedresponse",)),
     ("transient", ("connection reset", "temporary failure", "deadline exceeded")),

@@ -44,11 +44,11 @@ Launch an attended AGY TUI with the initial prompt immediately after `--prompt-i
 
 ```bash
 herdr agent start 'agy-<job>-<slug>' --cwd '<WORKSPACE>' -- \
-  agy --model '<HEALTHY_MODEL>' --prompt-interactive '<WORK_ORDER>' \
-  --mode plan --sandbox --log-file '<UNIQUE_LOG>'
+  agy --model '<HEALTHY_MODEL>' --add-dir '<WORKSPACE>' \
+  --prompt-interactive '<WORK_ORDER>' --mode plan --log-file '<UNIQUE_LOG>'
 ```
 
-For authorized edits, use `--mode accept-edits` and the same bounded write, command, network, and verification contract used by foreground execution. Never pass `--dangerously-skip-permissions`.
+For authorized edits, use `--mode accept-edits` and the same bounded write, command, network, and verification contract used by foreground execution. Add `--sandbox` only when the command trust boundary needs containment and the requested behavior remains valid inside it. Never pass `--dangerously-skip-permissions`.
 
 Do not wrap Herdr inside tmux. Herdr cannot inspect an AGY process hidden behind a nested multiplexer.
 

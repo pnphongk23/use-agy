@@ -43,6 +43,8 @@ Read only the references needed:
 11. Never rely on AGY's implicit default model. Use only an explicitly named Gemini 3.5 model. Never invoke GPT, Claude, Gemini 3.1, or another model family through this skill.
 12. Every automated invocation must use a unique `--log-file`; classify failures from exit code, stdout, and log evidence before retrying.
 13. Never let automation approve login, trust, consent, telemetry, privacy, or permission prompts. Pause and surface the exact request.
+14. Keep runtime permission separate from user authority. An allow rule only removes CLI friction; it never authorizes commit, push, deletion, deployment, publication, messaging, or another external side effect.
+15. Bind every automated run to its approved workspace. Pass `--add-dir '<WORKSPACE>'` and name the command working directory in the work order; do not assume process `cwd` becomes AGY's active project root.
 
 ## 1. Frame The Mission
 
@@ -103,6 +105,8 @@ agy --model '<MODEL>' -p 'Reply with exactly AGY_OK and nothing else.' \
 
 The model is healthy only when exit status is zero and normalized stdout is exactly `AGY_OK`. Do not treat authentication, model listing, planner events, or a live process as health evidence. If no listed Gemini 3.5 tier passes, stop AGY for the job; never cross-fallback to GPT or Claude. See the reliability reference for bounded fallback rules.
 
+Inspect the effective permission sources without printing unrelated settings or secrets: CLI `settings.json`, shared `userSettings.globalPermissionGrants`, and the selected project config. Remove stale risky allow rules before relying on an `ask` rule. Read [references/security-and-permissions.md](references/security-and-permissions.md) for the verified local profile.
+
 Select least authority:
 
 | Job | Mode | Files | Commands | Network |
@@ -115,7 +119,9 @@ Select least authority:
 
 `--mode plan` selects AGY's planning/review execution behavior; it is not the same as `--sandbox` and is not, by itself, proof of zero writes. Keep explicit `Write: NONE`, permission boundaries, and post-run inspection. Omit `--mode` only when the user explicitly prefers the configured default behavior or a verified CLI incompatibility requires it; do not remove it merely because community examples use auto-approval.
 
-Add `--sandbox` for command execution unless containment invalidates the requested check. Never enable `--dangerously-skip-permissions` through this skill. Never accept login, terms, telemetry, or privacy choices for the user.
+Use the terminal sandbox for untrusted commands, downloaded code, package lifecycle hooks, or network-capable execution. For a trusted repository job that requires Git metadata, either keep `git status`/`git diff` as supervisor-owned checks or omit the sandbox for that bounded run: local AGY 1.1.2 on macOS hides `.git` inside the sandbox and makes those commands fail. Never enable `--dangerously-skip-permissions` through this skill. Never accept login, terms, telemetry, or privacy choices for the user.
+
+Do not configure `allow: ["command(*)"]` together with narrower risky `ask` rules on local AGY 1.1.2. A negative probe showed `git commit --dry-run` executing despite `ask: ["command(git commit)"]`. Use explicit allow rules for routine read/search/test commands and leave commit, push, delete, publish, deploy, and system mutation absent from every allow source so they ask in TUI and soft-deny in headless mode.
 
 ## 4. Plan The Workforce
 
@@ -149,13 +155,13 @@ Use `--mode accept-edits` only for authorized implementation. Reuse a verified i
 Foreground exception calls:
 
 ```bash
-agy --model '<HEALTHY_MODEL>' -p '<WORK_ORDER>' --mode plan --sandbox \
+agy --model '<HEALTHY_MODEL>' --add-dir '<WORKSPACE>' -p '<WORK_ORDER>' --mode plan \
   --print-timeout 10m --log-file '<UNIQUE_LOG>'
-agy --model '<HEALTHY_MODEL>' -p '<WORK_ORDER>' --mode accept-edits --sandbox \
+agy --model '<HEALTHY_MODEL>' --add-dir '<WORKSPACE>' -p '<WORK_ORDER>' --mode accept-edits \
   --print-timeout 15m --log-file '<UNIQUE_LOG>'
 ```
 
-Put the prompt immediately after `-p`. Always use a unique log. Record why the foreground exception applies.
+Put the prompt immediately after `-p`. Always use a unique log and record why the foreground exception applies. Add `--sandbox` when the command trust boundary requires it and the requested check remains valid under containment. Adjust mode, timeout, conversation, and worktree according to the selected topology.
 
 ## 6. Observe And Steer
 

@@ -85,16 +85,18 @@ python3 scripts/orchestrate_herdr.py launch \
 For authorized edits, use `--mode accept-edits`. Use foreground only for a documented exception; put the prompt immediately after `-p`:
 
 ```bash
-agy --model 'Gemini 3.5 Flash (Medium)' -p '<GOLDEN_TEMPLATE>' \
-  --mode plan --sandbox --print-timeout 10m --log-file '<UNIQUE_LOG>'
+agy --model 'Gemini 3.5 Flash (Medium)' --add-dir '<WORKSPACE>' -p '<GOLDEN_TEMPLATE>' \
+  --mode plan --print-timeout 10m --log-file '<UNIQUE_LOG>'
 ```
 
 Foreground authorized edit exception:
 
 ```bash
-agy --model 'Gemini 3.5 Flash (Medium)' -p '<GOLDEN_TEMPLATE>' \
-  --mode accept-edits --sandbox --print-timeout 15m --log-file '<UNIQUE_LOG>'
+agy --model 'Gemini 3.5 Flash (Medium)' --add-dir '<WORKSPACE>' -p '<GOLDEN_TEMPLATE>' \
+  --mode accept-edits --print-timeout 15m --log-file '<UNIQUE_LOG>'
 ```
+
+Add `--sandbox` for untrusted or network-capable commands only after confirming containment preserves the required check. For local AGY 1.1.2 on macOS, keep Git metadata checks supervisor-owned or use a bounded trusted no-sandbox run because the sandbox hides `.git`.
 
 ## Execute Order
 

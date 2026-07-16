@@ -20,13 +20,15 @@ The July 11, 2026 local evidence showed the implicit/default model path emitting
 
 | Class | Evidence | Recovery |
 |---|---|---|
+| `unsafe_permission_allow` | a negative probe reports `RISK_UNEXPECTEDLY_ALLOWED` or equivalent | remove broad/overlapping allows from every merged source; do not run real risky commands |
 | `onboarding` | first-run theme or onboarding screen is visible | stop unattended execution and require the user to complete it in an attended TUI |
 | `adapter_empty` | empty/unusable stdout plus repeated `PlannerResponse without ModifiedResponse` | explicitly smoke-test the configured Gemini 3.5 tier, then another 3.5 tier if needed |
 | `quota` | `Resource has been exhausted` or quota error | choose another healthy Gemini 3.5 tier or stop |
 | `capacity` | 503, high traffic, or `No capacity available` | one delayed retry or another healthy Gemini 3.5 tier |
 | `auth` | final failure says not logged in; do not misclassify startup noise if OAuth later succeeds | stop and ask user to authenticate in attended TUI |
-| `permission` | pending/denied permission or confirmation with no unattended resolution | attended TUI or narrower authorized work |
+| `permission` | pending/denied permission, `headless mode cannot prompt`, or an auto-denied required tool | attended TUI for an authorized risky action, or a narrower exact allow rule for a routine action |
 | `sandbox` | `SANDBOX_COMMAND_BLOCKED`, operation-not-permitted, or containment violation | revise the command/scope; do not drop sandbox silently |
+| `workspace` | command ran in AGY scratch or reports `not a git repository` outside a sandbox failure | bind the approved root with `--add-dir` and an exact tool working directory |
 | `contract` | process succeeds but output omits or replaces required deliverable | one shorter corrective retry |
 | `transient` | network reset, service unavailable, temporary backend error | one bounded retry |
 | `unknown` | evidence does not match a known class | stop after two total attempts and diagnose directly |
