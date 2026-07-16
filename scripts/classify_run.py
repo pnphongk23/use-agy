@@ -27,7 +27,14 @@ def classify(
     stdout: str,
     exit_code: int | None,
     verified_interactive: bool = False,
+    interactive_status: str | None = None,
 ) -> tuple[str, list[str]]:
+    if verified_interactive and interactive_status == "partial":
+        return "partial", []
+    if verified_interactive and interactive_status == "blocked":
+        return "blocked", []
+    if verified_interactive and interactive_status == "done":
+        return "success", []
     text = f"{log_text}\n{stdout}".lower()
     for name, needles in PATTERNS:
         hits = [needle for needle in needles if needle in text]
@@ -37,8 +44,6 @@ def classify(
             if name == "adapter_empty" and stdout.strip():
                 continue
             return name, hits[:3]
-    if verified_interactive and stdout.strip():
-        return "success", []
     if exit_code == 0 and stdout.strip():
         return "success", []
     if exit_code == 0:
@@ -56,22 +61,31 @@ def main() -> int:
         action="store_true",
         help="Record a supervisor-verified bounded job in a still-running interactive TUI.",
     )
+    parser.add_argument("--interactive-status", choices=("done", "partial", "blocked"))
     parser.add_argument("--model", default="unknown")
     parser.add_argument("--job", default="unknown")
     parser.add_argument("--elapsed-seconds", type=float)
     parser.add_argument("--record", action="store_true")
     parser.add_argument(
         "--ledger",
-        default=str(Path(__file__).resolve().parents[1] / "evals/runtime-observations.jsonl"),
+        default=str(
+            Path(__file__).resolve().parents[1] / "evals/runtime-observations.jsonl"
+        ),
     )
     args = parser.parse_args()
 
     if args.verified_interactive and args.exit_code is not None:
         parser.error("--verified-interactive cannot be combined with --exit-code")
+    if args.interactive_status and not args.verified_interactive:
+        parser.error("--interactive-status requires --verified-interactive")
+    if args.verified_interactive and not args.interactive_status:
+        parser.error("--verified-interactive requires --interactive-status")
     if not args.verified_interactive and args.exit_code is None:
         parser.error("--exit-code is required unless --verified-interactive is used")
 
-    log_text = Path(args.log).read_text(errors="replace") if Path(args.log).exists() else ""
+    log_text = (
+        Path(args.log).read_text(errors="replace") if Path(args.log).exists() else ""
+    )
     stdout = ""
     if args.stdout_file and Path(args.stdout_file).exists():
         stdout = Path(args.stdout_file).read_text(errors="replace")
@@ -82,6 +96,7 @@ def main() -> int:
         stdout,
         args.exit_code,
         verified_interactive=args.verified_interactive,
+        interactive_status=args.interactive_status,
     )
     fingerprint_input = "\0".join(
         (args.model, args.job, str(args.exit_code), log_text, stdout)
@@ -93,6 +108,7 @@ def main() -> int:
         "exit_code": args.exit_code,
         "elapsed_seconds": args.elapsed_seconds,
         "classification": result,
+        "handoff_status": args.interactive_status,
         "stdout_nonempty": bool(stdout.strip()),
         "evidence_markers": markers,
         "run_fingerprint": hashlib.sha256(fingerprint_input).hexdigest()[:16],
@@ -113,7 +129,9 @@ def main() -> int:
         if observation["run_fingerprint"] in existing:
             return 0
         with ledger.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(observation, ensure_ascii=True, sort_keys=True) + "\n")
+            handle.write(
+                json.dumps(observation, ensure_ascii=True, sort_keys=True) + "\n"
+            )
     return 0
 
 

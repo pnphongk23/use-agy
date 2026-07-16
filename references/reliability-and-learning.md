@@ -6,9 +6,11 @@ Diagnose automated AGY failures from evidence, choose a bounded recovery, and im
 
 ## Session Health Gate
 
+The default path is `scripts/orchestrate_herdr.py prepare`, which performs the binary/version/model checks, bounded smoke test, observation recording, server startup ownership, and baseline capture. Use the manual sequence below when testing or repairing the helper.
+
 1. Run `agy --help`, `agy models`, and `agy agents` when capabilities matter.
 2. Do not use the implicit default model for automation. Only use explicitly named Gemini 3.5 models.
-3. Smoke-test `Gemini 3.5 Flash (Medium)` first, then Low and High only as bounded fallbacks. Never select GPT, Claude, Gemini 3.1, or another family.
+3. Smoke-test `Gemini 3.5 Flash (Medium)` first, then Low as the single automated fallback. Use High only when the user or a diagnosed task constraint explicitly selects it; never cascade through tiers. Never select GPT, Claude, Gemini 3.1, or another family.
 4. Require exit `0` and exact stdout. A model name in logs or a successful OAuth event is not a passing result.
 5. Reuse the passing model for the current session. Recheck after a quota, capacity, adapter, or repeated empty-output failure.
 
@@ -49,7 +51,9 @@ The classifier appends redacted JSON Lines to `evals/runtime-observations.jsonl`
 - short evidence markers, never raw prompts, URLs with secrets, tokens, emails, or full logs.
 - a content-derived run fingerprint used only to deduplicate repeated classification of the same run.
 
-For foreground automation, require the real process exit code. For a bounded work order completed inside a persistent Herdr TUI, capture only that work order's redacted terminal segment and use `--verified-interactive` after the handoff and independent verification both pass. This records `exit_code: null`. Never classify a whole reused-session log as one job, and never fabricate exit `0` merely because Herdr reports `idle`.
+For foreground automation, require the real process exit code. For a bounded work order completed inside a persistent Herdr TUI, capture only that work order's redacted terminal/log segments and use `--verified-interactive --interactive-status <done|partial|blocked>` after the handoff and independent verification. This records `exit_code: null` and does not collapse partial or blocked work into success. Never classify a whole reused-session log as one job, and never fabricate exit `0` merely because Herdr reports `idle`.
+
+`prepare` records smoke-test attempts automatically. It does not record an interactive work order as successful. After `snapshot`, the supervisor must inspect the diff/evidence and run acceptance checks before invoking `orchestrate_herdr.py record`; that command passes the captured job-specific terminal segment to `classify_run.py --verified-interactive --record`.
 
 Re-classifying the same log must not create another incident. Promotion counts unique fingerprints, distinct AGY conversations/runs, and at least two task contexts; repeated retries or repeated classifier calls against one log count once.
 

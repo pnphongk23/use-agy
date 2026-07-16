@@ -1,4 +1,4 @@
 interface:
   display_name: "Use AGY"
-  short_description: "Plan and supervise AGY execution workers"
-  default_prompt: "Use $use-agy to plan this task, choose the right AGY execution topology, supervise the worker, and independently verify the result."
+  short_description: "Automate and supervise AGY through Herdr"
+  default_prompt: "Use $use-agy to plan this task, run AGY through the default Herdr orchestration lifecycle, pause safely for attended input, and independently verify the result."

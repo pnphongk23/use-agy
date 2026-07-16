@@ -63,30 +63,27 @@ Do not parallelize coupled changes, shared files, sequential dependencies, or jo
 
 ## Runtime Selection
 
-### Foreground one-shot: default
+### Herdr-managed attended TUI: default
 
 Use when:
 
-- expected duration is short;
-- caller needs stdout and exit status immediately;
-- no human approval is expected;
-- CI or another process runner already owns lifecycle;
-- only one worker is active.
+- AGY receives any normal delegated research, diagnosis, implementation, or verification job;
+- the supervisor benefits from persistent evidence, live inspection, bounded steering, or safe permission pauses;
+- a session may be reused for sequential bounded work orders in one workspace and trust boundary.
 
-Benefits: simplest, observable, easy error propagation, easy cleanup.
+Use `scripts/orchestrate_herdr.py` for preflight, launch, observation, evidence capture, and cleanup. Herdr is the runtime default, not proof of correctness or expanded authority.
 
-### Herdr-managed AGY TUI
+### Foreground one-shot: exception
 
 Use when:
 
-- work is long-running, benefits from live progress, or may outlive the current terminal;
-- SSH/disconnect risk matters;
-- the supervisor needs to inspect or attach to the real AGY terminal;
-- permission, review, or course correction may be needed.
+- CI or a caller requires the real child-process exit status;
+- machine-readable stdout is the acceptance interface;
+- the user explicitly asks for a one-shot process;
+- Herdr is unavailable or incompatible and the supervisor discloses the fallback;
+- an extremely small latency-sensitive task clearly costs less to run than to establish a persistent session.
 
-Require: installed compatible Herdr, unique agent name, correct working directory, persistent AGY log, monitoring plan, and cleanup owner.
-
-Do not use merely because Herdr is installed. Avoid for short jobs, CI, and structured-output pipelines that require a direct process exit status.
+Do not choose foreground merely because a task is short. Preserve the same explicit model, unique log, authority envelope, bounded retries, and independent verification.
 
 ### Attended TUI in Herdr
 
@@ -105,7 +102,7 @@ Start fresh for isolated reproducible work. Use `--continue` only when latest di
 
 ## Herdr Lifecycle
 
-Treat Herdr as a persistent terminal and control surface, not a quality mechanism. Read [herdr-runtime.md](herdr-runtime.md) before operating a session.
+Treat Herdr as a persistent terminal and control surface, not a quality mechanism. Prefer the orchestration helper described in [herdr-runtime.md](herdr-runtime.md); use the manual commands only when diagnosing the helper itself or when a verified compatibility issue requires it.
 
 Before launch:
 

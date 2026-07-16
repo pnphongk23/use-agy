@@ -1,6 +1,6 @@
 ---
 name: use-agy
-description: Plan, delegate, coordinate, monitor, and verify work performed by Google Antigravity CLI (`agy`). Use whenever the user mentions agy or Antigravity CLI, asks the agent to act as planner/supervisor while AGY executes, wants an independent local worker for implementation/debugging/research, or needs intelligent selection among foreground execution, Herdr sessions, interactive TUI, sandboxing, conversations, and isolated worktrees. The supervising agent must adapt the execution topology to task duration, risk, interactivity, concurrency, and verification needs rather than blindly invoking AGY.
+description: Plan, delegate, coordinate, monitor, and verify work performed by Google Antigravity CLI (`agy`) through a default automated Herdr lifecycle. Use whenever the user mentions agy or Antigravity CLI, asks the agent to act as planner/supervisor while AGY executes, wants an independent local worker for implementation/debugging/research, or needs supervised foreground, TUI, sandbox, conversation, or isolated-worktree execution. The supervisor owns authority, attended-input boundaries, evidence capture, independent verification, and cleanup.
 ---
 
 # Use AGY
@@ -16,7 +16,7 @@ understand -> plan -> select worker/runtime -> issue work order
 -> observe -> steer/recover -> verify -> integrate -> report
 ```
 
-AGY performs bounded work; the supervisor remains accountable for the outcome. Herdr, TUI, sandbox, conversations, subagents, and worktrees are execution mechanisms selected by judgment, never goals or defaults.
+AGY performs bounded work; the supervisor remains accountable for the outcome. Use an attended AGY TUI managed by Herdr as this skill's default runtime. Sandbox, conversations, subagents, and worktrees remain mechanisms selected by task needs.
 
 Read only the references needed:
 
@@ -30,8 +30,9 @@ Read only the references needed:
 ## Supervisor Rules
 
 1. Understand the user's real outcome and definition of done before delegating.
-2. Choose the simplest adequate execution topology. Default to foreground one-shot; earn Herdr, TUI, parallelism, and worktrees through task needs.
+2. Default delegated work to an attended Herdr-managed AGY TUI and automate its lifecycle with `scripts/orchestrate_herdr.py`. Use foreground `agy -p` only for the documented exceptions below.
 3. Do not delegate a task merely because AGY exists. Use direct tools when work is trivial, latency-sensitive, unsafe to delegate, or easier to verify directly.
+   Do not ask AGY to modify this skill's own policy or orchestration code; make and verify those changes directly to avoid recursive self-supervision.
 4. Give each AGY invocation one bounded job with explicit authority and evidence-based acceptance checks.
 5. Separate discovery from mutation when uncertainty or blast radius is meaningful: `EXPLORE/DIAGNOSE -> supervisor review -> EXECUTE -> VERIFY`.
 6. Do not run concurrent writing workers in one checkout. Give each independent writer an isolated worktree and disjoint ownership.
@@ -41,6 +42,7 @@ Read only the references needed:
 10. Do not report completion while required AGY commands or Herdr sessions remain unobserved, working, or waiting for approval.
 11. Never rely on AGY's implicit default model. Use only an explicitly named Gemini 3.5 model. Never invoke GPT, Claude, Gemini 3.1, or another model family through this skill.
 12. Every automated invocation must use a unique `--log-file`; classify failures from exit code, stdout, and log evidence before retrying.
+13. Never let automation approve login, trust, consent, telemetry, privacy, or permission prompts. Pause and surface the exact request.
 
 ## 1. Frame The Mission
 
@@ -67,22 +69,32 @@ Classify each unit of work:
 
 Delegate when AGY offers meaningful independent execution, local tool access, long-running work, or a useful second pass. Work directly when delegation overhead exceeds the task, the task requires supervisor-only judgment, or AGY cannot safely receive the needed context.
 
-Choose runtime from task characteristics, not habit. Read [references/orchestration.md](references/orchestration.md) for the full matrix.
+Start with Herdr, then check whether a foreground exception applies. Read [references/orchestration.md](references/orchestration.md) for the full lifecycle.
 
 | Need | Preferred topology |
 |---|---|
-| Short bounded job, immediate result | foreground `agy -p` |
+| Normal delegated job, including short bounded edits | attended AGY TUI in Herdr + lifecycle automation |
 | Long job, live progress, or disconnect risk | attended AGY TUI in Herdr + persistent log |
 | Permission/review/course-correction expected | attended AGY TUI in Herdr |
 | Concurrent read-only jobs | separate calls; parallel only when useful |
 | Concurrent writing jobs | separate worktrees + separate sessions/logs |
 | CI/script requiring direct exit status | foreground process, not Herdr |
 
+Foreground is an exception only when direct process exit status or structured stdout is essential, the user explicitly requests it, Herdr is unavailable/incompatible, or an extremely small latency-sensitive job clearly cannot justify persistent-session setup. State the exception. Do not silently fall back when Herdr fails.
+
 ## 3. Establish The Control Envelope
 
 Preflight `command -v agy` and `agy --help`. Use only installed flags.
 
-Before real work, run `agy models`, then a no-tool smoke test against Gemini 3.5 Flash Medium, Low, or High. Prefer Medium, then Low, then High when a fallback is required. Use the smallest prompt and a 45-second timeout:
+Before real work, use the preferred lifecycle helper. `prepare` checks binaries and versions, starts a temporary Herdr server only when required, runs `agy models`, smoke-tests Medium with one Low fallback, captures the workspace baseline, and writes a manifest:
+
+```bash
+python3 scripts/orchestrate_herdr.py prepare \
+  --workspace '<WORKSPACE>' --run-dir '<UNIQUE_RUN_DIR>' \
+  --scope '<IN_SCOPE_PATH>'
+```
+
+If operating manually, run the equivalent no-tool smoke test with the smallest prompt and a 45-second timeout:
 
 ```bash
 agy --model '<MODEL>' -p 'Reply with exactly AGY_OK and nothing else.' \
@@ -122,7 +134,19 @@ Do not ask AGY to orchestrate subagents unless the task genuinely benefits from 
 
 Construct the prompt from [references/work-orders.md](references/work-orders.md). Put `JOB`, `MISSION`, and `DELIVERABLE` first. Include exhaustive read/write/command/network authority, stop conditions, definition of done, and handoff format.
 
-Canonical foreground calls:
+Write the order to a file outside the repository when possible, then launch the default Herdr runtime:
+
+```bash
+python3 scripts/orchestrate_herdr.py launch \
+  --run-dir '<RUN_DIR>' --prompt-file '<WORK_ORDER_FILE>' \
+  --mode plan
+python3 scripts/orchestrate_herdr.py observe \
+  --run-dir '<RUN_DIR>' --timeout 600
+```
+
+Use `--mode accept-edits` only for authorized implementation. Reuse a verified idle same-workspace session with `dispatch`, one bounded work order at a time and only after the prior job was snapshotted and recorded. The helper serializes lifecycle mutations, stores exact pane/terminal ownership, and requires the structured status inside a per-job begin/end marker block so echoed prompt text cannot satisfy the handoff. Exit `20` from `observe` means attended input is required; exit `21` means bounded observation timed out. Neither authorizes automatic input or retry.
+
+Foreground exception calls:
 
 ```bash
 agy --model '<HEALTHY_MODEL>' -p '<WORK_ORDER>' --mode plan --sandbox \
@@ -131,7 +155,7 @@ agy --model '<HEALTHY_MODEL>' -p '<WORK_ORDER>' --mode accept-edits --sandbox \
   --print-timeout 15m --log-file '<UNIQUE_LOG>'
 ```
 
-Put the prompt immediately after `-p`. Adjust mode, sandbox, timeout, conversation, Herdr session, and worktree according to the selected topology.
+Put the prompt immediately after `-p`. Always use a unique log. Record why the foreground exception applies.
 
 ## 6. Observe And Steer
 
@@ -143,6 +167,8 @@ Stay responsible while AGY runs:
 - Parallel workers: track ownership and dependencies; prevent shared-write conflicts.
 
 When reusing an idle Herdr TUI, deliver the next bounded work order through its resolved pane, observe evidence that the new prompt was accepted, then require a new `working` transition before waiting for `idle`. If `working` was too brief to observe, inspect newly appended terminal output instead of resending the prompt. Compare the post-job workspace to the per-job baseline before accepting claims about file changes.
+
+The lifecycle helper performs dispatch and bounded observation, but the supervisor must read its captured terminal and manifest. It deliberately stops at trust, onboarding, login, consent, or permission prompts. A conversation-scoped permission may be approved only by the user or by the supervisor after verifying that the exact operation is already within the current work order; never create a persistent/global allow rule without explicit user authority.
 
 Intervene when AGY drifts, stalls, exceeds scope, requests new authority, edits unexpected files, or reports unverifiable success. Stop unsafe work immediately. Use one concise corrective retry for a malformed handoff or objective drift; do not loop indefinitely.
 
@@ -164,7 +190,16 @@ Inspect worker output before accepting it:
 - Diagnosis: reproduce the symptom and validate the causal chain.
 - Verification: review counterexamples and unresolved uncertainty.
 
-Integrate only accepted output. Clean up temporary sessions/worktrees after preserving evidence and confirming no required process remains.
+Integrate only accepted output. After verification, preserve evidence and capture the final state:
+
+```bash
+python3 scripts/orchestrate_herdr.py snapshot --run-dir '<RUN_DIR>'
+python3 scripts/orchestrate_herdr.py record \
+  --run-dir '<RUN_DIR>' --job '<JOB_TYPE>'
+python3 scripts/orchestrate_herdr.py cleanup --run-dir '<RUN_DIR>'
+```
+
+Run `record` only after independently verifying the captured job segment and acceptance checks; it preserves `done`, `partial`, or `blocked` instead of treating every handoff as success. Use `--keep-agent` only when the user asks to inspect or continue the session; keeping an agent also keeps a server started by the run. Cleanup verifies exact pane/terminal ownership and otherwise stops a run-owned Herdr server only when no unrelated agents or panes use it.
 
 After every AGY run, record a redacted observation with `scripts/classify_run.py --record`. In a persistent Herdr TUI, treat each bounded work order as a run and use `--verified-interactive` only after a complete handoff and independent verification; do not invent a process exit code. Promote a workaround into this skill only after the evidence threshold in [references/reliability-and-learning.md](references/reliability-and-learning.md) is met. A single incident may change the current job's routing, but must not rewrite permanent policy.
 

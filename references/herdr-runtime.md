@@ -1,8 +1,29 @@
 # Herdr Runtime For AGY
 
-Use Herdr for long-running AGY work, live progress inspection, disconnect survival, and attended permission or review flows. Keep short bounded automation and CI in a foreground `agy -p` process.
+Use Herdr as the default runtime for delegated AGY work, including short bounded jobs. Use foreground `agy -p` only for direct-exit-status/structured-output workflows, an explicit user request, a disclosed Herdr incompatibility, or an exceptionally small latency-sensitive job.
 
 Herdr is a persistent terminal and control plane. Its AGY state is derived from the foreground process and terminal-screen rules, so `working`, `blocked`, `idle`, and `done` are attention signals rather than proof of completion.
+
+## Preferred Automated Lifecycle
+
+Run from the `use-agy` skill directory, or use absolute script paths:
+
+```bash
+python3 scripts/orchestrate_herdr.py prepare \
+  --workspace '<WORKSPACE>' --run-dir '<RUN_DIR>' --scope '<PATH>'
+python3 scripts/orchestrate_herdr.py launch \
+  --run-dir '<RUN_DIR>' --prompt-file '<ORDER>' --mode plan
+python3 scripts/orchestrate_herdr.py observe \
+  --run-dir '<RUN_DIR>' --timeout 600
+python3 scripts/orchestrate_herdr.py snapshot --run-dir '<RUN_DIR>'
+python3 scripts/orchestrate_herdr.py record \
+  --run-dir '<RUN_DIR>' --job '<JOB_TYPE>'
+python3 scripts/orchestrate_herdr.py cleanup --run-dir '<RUN_DIR>'
+```
+
+Use `accept-edits` for an authorized implementation. `prepare` creates the run directory, selects a healthy Gemini 3.5 model, captures a symlink-safe baseline, and records whether it started the server. `launch` stores exact pane/terminal ownership. `observe` requires the structured status inside generated per-job begin/end marker lines; it returns `0` for that handoff, `20` for attended input, `21` for timeout, and `2` for an orchestration error. `dispatch` reuses an owned idle session only after the prior job was recorded, durably marks dispatch pending before sending exactly once, and creates a new per-job baseline. `snapshot` is allowed only after a handoff or captured attention state; it captures full and job-specific terminal/log evidence but does not verify correctness. After independent verification, `record` preserves `done`, `partial`, or `blocked`. `cleanup` verifies ownership before closing and stops a run-started server only when no unrelated agents or panes use it; keeping an agent implicitly keeps that server.
+
+The helper never approves trust, onboarding, login, consent, telemetry, privacy, or permissions. Inspect the terminal file before acting on exit `20`. Use manual commands below for diagnosis or recovery, not as the routine path.
 
 ## Preflight
 
@@ -108,4 +129,4 @@ Do not accept Herdr state as the result. Before cleanup:
 
 If the pane exited before a usable handoff, classify the AGY run from its log and captured output. If Herdr state disagrees with the terminal, preserve `herdr agent explain --json` as detection evidence and trust direct process, terminal, log, and workspace evidence instead.
 
-For a completed work order in a still-running TUI, capture only the job-specific terminal segment, redact sensitive values, and record it with `scripts/classify_run.py --verified-interactive --record`. Use this flag only after the return contract is complete and the supervisor has independently verified the result. The ledger records `exit_code: null`; never pass a fabricated zero for a process that has not exited.
+For a completed work order in a still-running TUI, capture only the job-specific terminal segment, redact sensitive values, and prefer `orchestrate_herdr.py record`. A manual classifier call must include `--verified-interactive --interactive-status <done|partial|blocked> --record`. Record only after the handoff and independent verification. The ledger records `exit_code: null`; never pass a fabricated zero for a process that has not exited.

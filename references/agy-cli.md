@@ -40,7 +40,7 @@ The current local help does not expose `--cwd`, although an official best-practi
 
 ## Invocation Selection
 
-Use `--print` or `-p` for automation, isolated jobs, captured output, and reproducible retries. Put the prompt immediately after that flag, then append other options:
+Within this skill, the default is `--prompt-interactive` in a Herdr-managed TUI. Use `--print` or `-p` only when direct process exit status or structured stdout is essential, the user explicitly requests it, Herdr is unavailable/incompatible, or the job is exceptionally small and latency-sensitive. Put the prompt immediately after the flag, then append other options:
 
 ```bash
 agy --model 'Gemini 3.5 Flash (Medium)' -p '<WORK_ORDER>' \
@@ -63,7 +63,7 @@ Set `--print-timeout` above five minutes for builds or broad research.
 
 Use `--prompt-interactive` only for a human-attended TUI session. First launch may show theme, sign-in, terms, telemetry, and privacy choices. Never complete those choices for the user.
 
-For long-running or interaction-prone work, launch that TUI through Herdr as described in [herdr-runtime.md](herdr-runtime.md). Herdr preserves and exposes the real terminal but does not change AGY permissions, sandboxing, model selection, or the requirement for independent verification.
+For delegated work, launch that TUI through Herdr by default as described in [herdr-runtime.md](herdr-runtime.md). Herdr preserves and exposes the real terminal but does not change AGY permissions, sandboxing, model selection, or the requirement for independent verification.
 
 Use `--continue` only for the latest conversation in the current working directory. Conversations are directory-scoped. Use `--conversation <id>` when an exact session is required. Fresh one-shot calls reduce context contamination.
 

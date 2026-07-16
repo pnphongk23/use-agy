@@ -10,6 +10,7 @@ Read before any job involving writes, commands, network, MCP, non-workspace path
 - Outside workspace: deny by default; use `--add-dir` only for a named approved root.
 - Unattended work: do not depend on interactive permission approval.
 - Never use `--dangerously-skip-permissions` through this skill.
+- Never create persistent/global permission rules without explicit user authorization.
 
 `--mode plan` is an execution-mode guard, not proof that no side effect can ever occur. Still inspect the workspace afterward.
 
@@ -66,4 +67,4 @@ When AGY requests login, terms acceptance, telemetry consent, browser authorizat
 3. Ask the user to complete identity/consent steps themselves or approve a narrowly scoped alternative.
 4. Resume with a fresh or explicitly selected conversation after access is ready.
 
-Never claim success when work is waiting for an interactive approval.
+Never claim success when work is waiting for an interactive approval. A supervisor may approve a conversation-scoped operation only after verifying its exact command/path/domain is already authorized by the current work order. If the request is broader, ambiguous, identity-related, or persistent, pause for the user. Automation must only detect and surface these prompts; it must not answer them.
