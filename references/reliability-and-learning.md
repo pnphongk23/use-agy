@@ -14,7 +14,7 @@ The default path is `scripts/orchestrate_herdr.py prepare`, which performs the b
 4. Require exit `0` and exact stdout. A model name in logs or a successful OAuth event is not a passing result.
 5. Reuse the passing model for the current session. Recheck after a quota, capacity, adapter, or repeated empty-output failure.
 
-The July 11, 2026 local evidence showed the implicit/default model path emitting `PlannerResponse without ModifiedResponse` with no usable stdout. Explicitly selecting `Gemini 3.5 Flash (Medium)` then passed both the plain no-tool smoke test and the `--mode plan --sandbox` smoke test. The workaround is explicit Gemini 3.5 selection, not a cross-family fallback.
+The July 11, 2026 AGY 1.1.2 local evidence showed the implicit/default model path emitting `PlannerResponse without ModifiedResponse` with no usable stdout. Explicitly selecting `Gemini 3.5 Flash (Medium)` then passed both the plain no-tool smoke test and the `--mode plan --sandbox` smoke test. The installed binary is now 1.1.3; retain the explicit-model workaround until the original path passes the documented retirement checks. The workaround is explicit Gemini 3.5 selection, not a cross-family fallback.
 
 ## Failure Classes
 
@@ -27,7 +27,7 @@ The July 11, 2026 local evidence showed the implicit/default model path emitting
 | `capacity` | 503, high traffic, or `No capacity available` | one delayed retry or another healthy Gemini 3.5 tier |
 | `auth` | final failure says not logged in; do not misclassify startup noise if OAuth later succeeds | stop and ask user to authenticate in attended TUI |
 | `permission` | pending/denied permission, `headless mode cannot prompt`, or an auto-denied required tool | attended TUI for an authorized risky action, or a narrower exact allow rule for a routine action |
-| `sandbox` | `SANDBOX_COMMAND_BLOCKED`, operation-not-permitted, or containment violation | revise the command/scope; do not drop sandbox silently |
+| `sandbox` | `SANDBOX_COMMAND_BLOCKED`, operation-not-permitted, or containment violation | use an authorized in-bound alternative or revise runtime containment without expanding task authority; do not drop sandbox silently |
 | `workspace` | command ran in AGY scratch or reports `not a git repository` outside a sandbox failure | bind the approved root with `--add-dir` and an exact tool working directory |
 | `contract` | process succeeds but output omits or replaces required deliverable | one shorter corrective retry |
 | `transient` | network reset, service unavailable, temporary backend error | one bounded retry |

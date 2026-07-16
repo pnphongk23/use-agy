@@ -26,7 +26,7 @@ Before invoking AGY, score the job informally:
 | Verification | one cheap check | multiple checks/manual evidence |
 | Disconnect risk | stable local process | SSH, overnight, laptop workflow |
 
-Use AGY when a bounded worker can materially reduce time, provide independent evidence, or execute local tooling. Do not use AGY when direct completion is faster, context is too sensitive, the task is an ambiguous product decision, or verification would cost more than doing the work.
+Use AGY when a worker with a bounded mission and effect envelope can materially reduce time, provide independent evidence, or execute local tooling. Give it broad read-only workspace discovery and free installed-skill activation so it can find relationships that were not known when the work order was written. Do not use AGY when direct completion is faster, context is too sensitive, the task is an ambiguous product decision, or verification would cost more than doing the work.
 
 ## Task Decomposition
 
@@ -110,7 +110,7 @@ Before launch:
 2. Choose a collision-resistant agent name such as `agy-<job>-<slug>` and confirm it is unused.
 3. Set the intended workspace/worktree as session working directory.
 4. Choose a log path that contains no secrets.
-5. Define timeout, poll method, approval strategy, and cleanup owner.
+5. Define timeout, poll method, effect-approval strategy, output-review strategy, and cleanup owner.
 
 During execution:
 
@@ -120,15 +120,16 @@ During execution:
 4. Use `herdr agent explain` when screen-derived state conflicts with the visible terminal.
 5. Treat `working`, `blocked`, `idle`, and `done` as attention hints, not proof of task success or process exit.
 6. Attach only when interaction is required; never auto-approve login, consent, or expanded permissions.
-7. Stop the worker when behavior becomes unsafe or out of scope.
+7. Stop the worker when behavior becomes unsafe, leaves the mission, or exceeds the effect boundary. Do not treat an unexpected workspace read or installed-skill activation as a violation.
 
 At completion:
 
 1. Capture the final terminal output, AGY log, handoff, and process state.
 2. Compare against the baseline for that exact work order, independently inspect workspace changes, and run acceptance checks.
-3. Record a redacted per-work-order observation; use a verified-interactive record when the TUI remains alive instead of fabricating an exit code.
-4. Close the pane only after evidence is preserved and no interaction remains necessary.
-5. Confirm the agent no longer appears in `herdr agent list`; stop a temporary Herdr server if this workflow started it.
+3. Review the handoff claim by claim: open cited files/sources, validate relationships and stated absences, reject unsupported certainty, and check that loaded guidance did not replace the mission.
+4. Record a redacted per-work-order observation; use a verified-interactive record when the TUI remains alive instead of fabricating an exit code.
+5. Close the pane only after evidence is preserved and no interaction remains necessary.
+6. Confirm the agent no longer appears in `herdr agent list`; stop a temporary Herdr server if this workflow started it.
 
 Remember: Herdr screen detection for AGY is heuristic. A visible `idle` or `done` state never replaces the handoff and independent verification.
 
@@ -166,7 +167,7 @@ Interpret states:
 Intervene when:
 
 - output no longer addresses the mission;
-- commands/paths/domains exceed authority;
+- writes, commands, secret/non-workspace paths, domains, MCP/browser/subagent calls, or external actions exceed authority;
 - AGY claims success without evidence;
 - expected output is silent beyond a reasonable task-specific interval;
 - a worker modifies another worker's ownership;
@@ -187,6 +188,8 @@ The supervisor may report completion only when:
 - every worker is done, failed and handled, or intentionally stopped;
 - no required foreground process or Herdr session remains unobserved;
 - changed files and sources have been independently inspected;
+- every material output claim has direct evidence or is explicitly marked uncertain;
+- the supervisor has attempted to falsify consequential claims instead of accepting the handoff structure;
 - acceptance checks have been rerun or inability is disclosed;
 - temporary worktrees/sessions have an explicit retained-or-cleaned state;
 - user-facing report separates AGY claims from supervisor verification.

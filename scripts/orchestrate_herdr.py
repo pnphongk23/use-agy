@@ -169,6 +169,12 @@ def lexical_scoped_path(workspace: Path, value: str) -> Path | None:
     return None
 
 
+def manifest_evidence_scopes(manifest: dict) -> list[str]:
+    """Return baseline hashing scopes, including legacy run manifests."""
+    value = manifest.get("evidence_scopes", manifest.get("scopes", []))
+    return value if isinstance(value, list) else []
+
+
 def write_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -519,7 +525,10 @@ def prepare(args: argparse.Namespace) -> int:
             raise OrchestrationError("no Gemini 3.5 smoke-test candidate passed")
 
         agent_name = args.agent_name or f"agy-{workspace.name}-{uuid.uuid4().hex[:6]}"
-        baseline = git_baseline(workspace, args.scope)
+        evidence_scopes = getattr(
+            args, "evidence_scope", getattr(args, "scope", [])
+        )
+        baseline = git_baseline(workspace, evidence_scopes)
         write_json(run_dir / "baseline-1.json", baseline)
         manifest = {
             "schema_version": 1,
@@ -538,7 +547,7 @@ def prepare(args: argparse.Namespace) -> int:
             "smoke_elapsed_seconds": round(time.monotonic() - started, 3),
             "job_sequence": 1,
             "baseline_file": "baseline-1.json",
-            "scopes": args.scope,
+            "evidence_scopes": evidence_scopes,
         }
         save_manifest(run_dir, manifest)
         manifest_durable = True
@@ -588,6 +597,8 @@ def launch(args: argparse.Namespace) -> int:
         "agy",
         "--model",
         manifest["model"],
+        "--add-dir",
+        manifest["workspace"],
         "--prompt-interactive",
         prompt,
         "--mode",
@@ -652,7 +663,9 @@ def dispatch(args: argparse.Namespace) -> int:
         raise OrchestrationError("agent is not idle; do not dispatch another job")
 
     sequence = int(manifest.get("job_sequence", 1)) + 1
-    baseline = git_baseline(Path(manifest["workspace"]), manifest.get("scopes", []))
+    baseline = git_baseline(
+        Path(manifest["workspace"]), manifest_evidence_scopes(manifest)
+    )
     write_json(run_dir / f"baseline-{sequence}.json", baseline)
     terminal = read_terminal(manifest["agent_name"], lines=120)
     (run_dir / f"terminal-before-{sequence}.txt").write_text(terminal, encoding="utf-8")
@@ -787,7 +800,9 @@ def snapshot(args: argparse.Namespace) -> int:
             log_segment_path.write_bytes(handle.read())
     else:
         log_segment_path.write_bytes(b"")
-    post = git_baseline(Path(manifest["workspace"]), manifest.get("scopes", []))
+    post = git_baseline(
+        Path(manifest["workspace"]), manifest_evidence_scopes(manifest)
+    )
     post_path = run_dir / f"post-{sequence}.json"
     write_json(post_path, post)
     baseline = json.loads((run_dir / manifest["baseline_file"]).read_text())
@@ -910,7 +925,14 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_parser.add_argument("--run-dir")
     prepare_parser.add_argument("--model", default=DEFAULT_MODEL)
     prepare_parser.add_argument("--agent-name")
-    prepare_parser.add_argument("--scope", action="append", default=[])
+    prepare_parser.add_argument(
+        "--evidence-scope",
+        "--scope",
+        dest="evidence_scope",
+        action="append",
+        default=[],
+        help="workspace-relative path to hash for baseline evidence; does not restrict AGY reads",
+    )
     prepare_parser.add_argument("--no-model-fallback", action="store_true")
     prepare_parser.set_defaults(handler=prepare)
 

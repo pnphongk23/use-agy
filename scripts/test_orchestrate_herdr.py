@@ -183,6 +183,31 @@ class OrchestrateHerdrTest(unittest.TestCase):
             self.assertEqual(value["phase"], "prepared")
             self.assertIn("updated_at", value)
 
+    def test_manifest_evidence_scopes_supports_current_and_legacy_runs(self) -> None:
+        self.assertEqual(
+            orchestration.manifest_evidence_scopes({"evidence_scopes": ["src"]}),
+            ["src"],
+        )
+        self.assertEqual(
+            orchestration.manifest_evidence_scopes({"scopes": ["legacy"]}),
+            ["legacy"],
+        )
+
+    def test_prepare_scope_alias_is_named_as_evidence_not_access(self) -> None:
+        parser = orchestration.build_parser()
+        args = parser.parse_args(
+            [
+                "prepare",
+                "--workspace",
+                "/tmp/workspace",
+                "--scope",
+                "legacy",
+                "--evidence-scope",
+                "src",
+            ]
+        )
+        self.assertEqual(args.evidence_scope, ["legacy", "src"])
+
     def test_baseline_signature_ignores_capture_time(self) -> None:
         before = {"captured_at": "before", "tracked_diff_sha256": "same"}
         after = {"captured_at": "after", "tracked_diff_sha256": "same"}
@@ -225,7 +250,7 @@ class OrchestrateHerdrTest(unittest.TestCase):
                 run_dir=str(run_dir),
                 model=orchestration.DEFAULT_MODEL,
                 agent_name="test-agent",
-                scope=["lib"],
+                evidence_scope=["lib"],
                 no_model_fallback=False,
             )
 
@@ -264,6 +289,7 @@ class OrchestrateHerdrTest(unittest.TestCase):
             self.assertEqual(manifest["phase"], "prepared")
             self.assertEqual(manifest["model"], orchestration.DEFAULT_MODEL)
             self.assertFalse(manifest["server_started"])
+            self.assertEqual(manifest["evidence_scopes"], ["lib"])
 
     def test_prepare_stops_owned_server_when_baseline_capture_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -275,7 +301,7 @@ class OrchestrateHerdrTest(unittest.TestCase):
                 run_dir=str(root / "run"),
                 model=orchestration.DEFAULT_MODEL,
                 agent_name="test-agent",
-                scope=[],
+                evidence_scope=[],
                 no_model_fallback=True,
             )
 
@@ -399,6 +425,49 @@ class OrchestrateHerdrTest(unittest.TestCase):
                 with self.assertRaises(orchestration.OrchestrationError):
                     orchestration.launch(args)
             self.assertEqual(listed.call_count, 1)
+
+    def test_launch_binds_workspace_with_cwd_and_add_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            prompt = run_dir / "prompt.txt"
+            prompt.write_text("JOB: EXPLORE\nMISSION: map code")
+            orchestration.save_manifest(
+                run_dir,
+                {
+                    "phase": "prepared",
+                    "agent_name": "agent",
+                    "workspace": str(run_dir),
+                    "model": orchestration.DEFAULT_MODEL,
+                    "job_sequence": 1,
+                },
+            )
+            args = argparse.Namespace(
+                run_dir=str(run_dir),
+                prompt_file=str(prompt),
+                mode="plan",
+                no_sandbox=True,
+            )
+            completed = subprocess.CompletedProcess(
+                [],
+                0,
+                '{"result":{"agent":{"name":"agent","pane_id":"pane","terminal_id":"terminal"}}}',
+                "",
+            )
+            with (
+                mock.patch.object(orchestration, "list_agents", return_value=[]),
+                mock.patch.object(orchestration, "run", return_value=completed) as run,
+                mock.patch.object(orchestration, "read_terminal", return_value="ready"),
+                mock.patch("builtins.print"),
+            ):
+                self.assertEqual(orchestration.launch(args), 0)
+
+            argv = run.call_args_list[0].args[0]
+            self.assertEqual(argv[0:3], ["herdr", "agent", "start"])
+            self.assertIn("--cwd", argv)
+            self.assertEqual(argv[argv.index("--cwd") + 1], str(run_dir))
+            self.assertIn("--add-dir", argv)
+            self.assertEqual(argv[argv.index("--add-dir") + 1], str(run_dir))
+            self.assertLess(argv.index("--add-dir"), argv.index("--prompt-interactive"))
 
 
 if __name__ == "__main__":

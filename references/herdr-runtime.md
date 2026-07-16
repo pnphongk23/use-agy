@@ -10,7 +10,8 @@ Run from the `use-agy` skill directory, or use absolute script paths:
 
 ```bash
 python3 scripts/orchestrate_herdr.py prepare \
-  --workspace '<WORKSPACE>' --run-dir '<RUN_DIR>' --scope '<PATH>'
+  --workspace '<WORKSPACE>' --run-dir '<RUN_DIR>' \
+  --evidence-scope '<PATH_TO_HASH_FOR_BASELINE>'
 python3 scripts/orchestrate_herdr.py launch \
   --run-dir '<RUN_DIR>' --prompt-file '<ORDER>' --mode plan
 python3 scripts/orchestrate_herdr.py observe \
@@ -21,7 +22,7 @@ python3 scripts/orchestrate_herdr.py record \
 python3 scripts/orchestrate_herdr.py cleanup --run-dir '<RUN_DIR>'
 ```
 
-Use `accept-edits` for an authorized implementation. `prepare` creates the run directory, selects a healthy Gemini 3.5 model, captures a symlink-safe baseline, and records whether it started the server. `launch` stores exact pane/terminal ownership. `observe` requires the structured status inside generated per-job begin/end marker lines; it returns `0` for that handoff, `20` for attended input, `21` for timeout, and `2` for an orchestration error. `dispatch` reuses an owned idle session only after the prior job was recorded, durably marks dispatch pending before sending exactly once, and creates a new per-job baseline. `snapshot` is allowed only after a handoff or captured attention state; it captures full and job-specific terminal/log evidence but does not verify correctness. After independent verification, `record` preserves `done`, `partial`, or `blocked`. `cleanup` verifies ownership before closing and stops a run-started server only when no unrelated agents or panes use it; keeping an agent implicitly keeps that server.
+Use `accept-edits` for an authorized implementation. `prepare` creates the run directory, selects a healthy Gemini 3.5 model, captures a symlink-safe baseline, and records whether it started the server. `--evidence-scope` controls which existing untracked content is hashed for evidence; it never restricts AGY's read access. The legacy `--scope` spelling remains an alias. `launch` binds the approved workspace with both Herdr `--cwd` and AGY `--add-dir`, then stores exact pane/terminal ownership. `observe` requires the structured status inside generated per-job begin/end marker lines; it returns `0` for that handoff, `20` for attended input, `21` for timeout, and `2` for an orchestration error. `dispatch` reuses an owned idle session only after the prior job was recorded, durably marks dispatch pending before sending exactly once, and creates a new per-job baseline. `snapshot` is allowed only after a handoff or captured attention state; it captures full and job-specific terminal/log evidence but does not verify correctness. After independent verification, `record` preserves `done`, `partial`, or `blocked`. `cleanup` verifies ownership before closing and stops a run-started server only when no unrelated agents or panes use it; keeping an agent implicitly keeps that server.
 
 The helper never approves trust, onboarding, login, consent, telemetry, privacy, or permissions. Inspect the terminal file before acting on exit `20`. Use manual commands below for diagnosis or recovery, not as the routine path.
 
@@ -32,7 +33,7 @@ Before launch:
 1. Run `command -v herdr`, `herdr --version`, and `herdr status`.
 2. Require compatible client/server protocol versions. If no server is running, start a temporary one with `herdr server`; do not enable a login service merely for one job.
 3. Run the normal AGY health gate and select an explicitly healthy Gemini 3.5 tier.
-4. Choose a unique agent name, workspace, log path, authority boundary, monitoring cadence, and cleanup owner.
+4. Choose a unique agent name, workspace, log path, effect boundary, monitoring cadence, output-review strategy, and cleanup owner.
 5. Inspect `herdr agent list` to avoid reusing an active name.
 6. Capture a workspace baseline appropriate to the job before dispatch. In Git repositories, include status and a tracked-diff hash; if relevant untracked files already exist, hash their in-scope contents too. A status-only snapshot cannot prove that an existing untracked file was unchanged.
 
@@ -115,7 +116,7 @@ Silence alone is not a failure. When output appears stale:
 2. Run `herdr agent get` and `herdr agent explain --json`.
 3. Resolve the pane id from `herdr agent get`, then inspect it with `herdr pane process-info <pane-id>`.
 4. Distinguish a visible permission wait, active recognized spinner/task, completed handoff, process exit, and unrecognized silent state.
-5. Attach for attended inspection when ambiguity remains. Stop only for unsafe behavior, scope drift, or a confirmed failed process.
+5. Attach for attended inspection when ambiguity remains. Stop only for unsafe behavior, mission/effect drift, or a confirmed failed process.
 
 ## Completion And Cleanup
 
@@ -124,8 +125,9 @@ Do not accept Herdr state as the result. Before cleanup:
 1. Preserve the AGY handoff, terminal output, unique log, and any failure evidence.
 2. Confirm the task is not waiting for input or approval.
 3. Compare the workspace to the baseline captured immediately before this work order, independently inspect all changed files, and run the acceptance checks. A baseline captured only before a corrective retry says nothing about the original attempt.
-4. Resolve the agent to its pane, close that pane only when no further interaction is needed, and confirm it disappears from `herdr agent list`.
-5. Stop the Herdr server only if this workflow started a temporary server and no other workspace, tab, pane, or agent is using it.
+4. Review the output claim by claim: open cited files or primary sources, confirm relationships and stated absences, reject invented or unsupported evidence, and attempt to falsify consequential conclusions.
+5. Resolve the agent to its pane, close that pane only when no further interaction is needed, and confirm it disappears from `herdr agent list`.
+6. Stop the Herdr server only if this workflow started a temporary server and no other workspace, tab, pane, or agent is using it.
 
 If the pane exited before a usable handoff, classify the AGY run from its log and captured output. If Herdr state disagrees with the terminal, preserve `herdr agent explain --json` as detection evidence and trust direct process, terminal, log, and workspace evidence instead.
 
