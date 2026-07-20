@@ -26,7 +26,7 @@ Before invoking AGY, score the job informally:
 | Verification | one cheap check | multiple checks/manual evidence |
 | Disconnect risk | stable local process | SSH, overnight, laptop workflow |
 
-Use AGY when a worker with a bounded mission and effect envelope can materially reduce time, provide independent evidence, or execute local tooling. Give it broad read-only workspace discovery and free installed-skill activation so it can find relationships that were not known when the work order was written. Do not use AGY when direct completion is faster, context is too sensitive, the task is an ambiguous product decision, or verification would cost more than doing the work.
+Use AGY when a worker with a bounded mission and effect envelope can materially reduce time, provide independent evidence, or execute local tooling. Grant broad read-only workspace discovery, but guide the worker to start with repository routers, targeted search, relevant code relationships, and nearby tests. Treat file lists and counts as starting context, not read limits; follow additional workspace dependencies when evidence makes them relevant. Let the worker activate installed skills freely, then judge completion by independent verification rather than by which files it read. Do not use AGY when direct completion is faster, context is too sensitive, the task is an ambiguous product decision, or verification would cost more than doing the work.
 
 ## Task Decomposition
 
@@ -71,7 +71,7 @@ Use when:
 - the supervisor benefits from persistent evidence, live inspection, bounded steering, or safe permission pauses;
 - a session may be reused for sequential bounded work orders in one workspace and trust boundary.
 
-Use `scripts/orchestrate_herdr.py` for preflight, launch, observation, evidence capture, and cleanup. Herdr is the runtime default, not proof of correctness or expanded authority.
+Use `scripts/orchestrate_herdr.py` for preflight, launch, observation, evidence capture, and cleanup only after the user explicitly invokes `$use-agy` or requests Herdr. A mere AGY mention does not authorize external Herdr control. Herdr is then the runtime default, not proof of correctness or expanded authority.
 
 ### Foreground one-shot: exception
 
@@ -115,7 +115,7 @@ Before launch:
 During execution:
 
 1. Capture a fresh workspace baseline immediately before every bounded work order, including follow-ups in a reused session.
-2. Poll `herdr agent get`, `herdr agent read`, and the persistent AGY log.
+2. Poll the manifest-owned pane ID and persistent AGY log. Treat terminal reads as progress/diagnostic evidence, not as the completion channel.
 3. For a reused idle TUI, confirm prompt acceptance and observe `working` before waiting for a new `idle`; inspect appended terminal output when a brief transition is missed.
 4. Use `herdr agent explain` when screen-derived state conflicts with the visible terminal.
 5. Treat `working`, `blocked`, `idle`, and `done` as attention hints, not proof of task success or process exit.
@@ -124,14 +124,14 @@ During execution:
 
 At completion:
 
-1. Capture the final terminal output, AGY log, handoff, and process state.
+1. Require the helper-owned handoff extracted read-only from the exact AGY conversation database pinned by the job log; also capture terminal output, AGY log, and process state as supporting evidence.
 2. Compare against the baseline for that exact work order, independently inspect workspace changes, and run acceptance checks.
 3. Review the handoff claim by claim: open cited files/sources, validate relationships and stated absences, reject unsupported certainty, and check that loaded guidance did not replace the mission.
 4. Record a redacted per-work-order observation; use a verified-interactive record when the TUI remains alive instead of fabricating an exit code.
 5. Close the pane only after evidence is preserved and no interaction remains necessary.
 6. Confirm the agent no longer appears in `herdr agent list`; stop a temporary Herdr server if this workflow started it.
 
-Remember: Herdr screen detection for AGY is heuristic. A visible `idle` or `done` state never replaces the handoff and independent verification.
+Remember: Herdr screen detection for AGY is heuristic. A visible `idle` or `done` state and a terminal marker never replace the raw conversation handoff and independent verification. If the AGY stream completed without a valid raw handoff, fail fast; do not rerun work merely to repair evidence markers, shorten the handoff, or recover lost scrollback.
 
 ## Concurrency And Worktrees
 
@@ -176,9 +176,11 @@ Intervene when:
 Use steering proportional to the problem:
 
 1. Clarify one missing fact or contract field.
-2. Stop and issue one shorter corrective retry for objective drift.
+2. Stop and issue one shorter corrective retry for substantive objective drift before completion.
 3. Re-plan or work directly after repeated failure.
 4. Ask the user only for genuinely new authority or a material decision.
+
+Do not use corrective retry for Herdr evidence capture after the AGY stream already completed. `malformed_handoff`, missing raw markers, terminal wrapping, and scrollback loss are orchestration/contract failures to preserve and diagnose.
 
 ## Completion Protocol
 

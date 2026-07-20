@@ -42,7 +42,7 @@ AGY merges multiple permission sources. Inspect all sources that can affect the 
 - `~/.gemini/config/config.json` → `userSettings.globalPermissionGrants`;
 - `~/.gemini/config/projects/<project>.json` → project-specific settings/grants.
 
-Project-specific settings can override global settings. More importantly, a local AGY 1.1.2 probe did not honor the documented `ask > allow` expectation when `command(*)` was allowed and `command(git commit)` was asked: `git commit --dry-run` executed. The currently installed 1.1.3 binary has not yet passed a replacement negative probe, so retain this conservative rule until it does. Do not use a broad command wildcard as a safety profile until a newer installed binary passes both the safe and risky probes.
+Project-specific settings can override global settings. More importantly, a local AGY 1.1.2 probe did not honor the documented `ask > allow` expectation when `command(*)` was allowed and `command(git commit)` was asked: `git commit --dry-run` executed. The currently installed AGY 1.1.4 binary has not yet passed a replacement negative probe, so retain this conservative rule until it does. Do not use a broad command wildcard as a safety profile until a newer installed binary passes both the safe and risky probes.
 
 ## Verified Low-Friction Profile
 
@@ -93,7 +93,7 @@ Official docs describe terminal sandboxing as OS-level containment. The installe
 
 In sandbox mode, permission grants populate filesystem and network allowlists. A blocked operation may mean the runtime envelope is narrower than the already authorized job; it is not itself permission to escape containment. Either use an authorized in-bound alternative, revise runtime configuration without expanding task authority, or ask the user if a genuinely new effect is required.
 
-A local AGY 1.1.2 macOS probe found that `git status --short` failed with exit 128 inside `--sandbox` because `.git` was hidden, even after `read_file(.git/)` was allowed. Installed 1.1.3 has not yet passed a replacement probe, so retain the conservative workaround: for trusted repository inspection, prefer supervisor-owned Git checks. If AGY itself must inspect Git metadata, run one bounded no-sandbox job with the exact workspace supplied by `--add-dir` and the tool command working directory set to that root.
+A local AGY 1.1.2 macOS probe found that `git status --short` failed with exit 128 inside `--sandbox` because `.git` was hidden, even after `read_file(.git/)` was allowed. Installed AGY 1.1.4 has not yet passed a replacement probe, so retain the conservative workaround: for trusted repository inspection, prefer supervisor-owned Git checks. If AGY itself must inspect Git metadata, run one bounded no-sandbox job with the exact workspace supplied by `--add-dir` and the tool command working directory set to that root.
 
 Sandboxing reduces impact but does not make untrusted code safe. Avoid executing downloaded scripts, package lifecycle hooks, unknown binaries, and destructive commands unless the user explicitly requested and authorized them.
 

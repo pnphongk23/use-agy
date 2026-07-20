@@ -4,7 +4,7 @@ Use this reference to select supported CLI behavior. Prefer the installed binary
 
 ## Sources Checked
 
-- Local AGY 1.1.3: `agy --version`, `agy --help`, and `agy changelog` checked on 2026-07-17. Model, agent, sandbox, workspace, and permission behavior probes noted below were run on 1.1.2 unless stated otherwise.
+- Local AGY 1.1.4: `agy --version` checked on 2026-07-21. `agy --help` and `agy changelog` were checked on 2026-07-17. Model, agent, sandbox, workspace, and permission behavior probes noted below were run on 1.1.2 unless stated otherwise.
 - Built-in guide: `~/.gemini/antigravity-cli/builtin/skills/antigravity_guide/`.
 - Official docs: `https://antigravity.google/docs/cli-overview`, `/cli-using`, `/cli-best-practices`, `/cli-prompting`, `/cli-reference`, `/cli-conversations`, `/cli-subagents`, `/cli-permissions`, and `/cli-sandbox`.
 
@@ -47,7 +47,7 @@ agy --model 'Gemini 3.5 Flash (Medium)' --add-dir '<WORKSPACE>' -p '<WORK_ORDER>
   --mode plan --print-timeout 10m --log-file '<UNIQUE_LOG>'
 ```
 
-Add `--sandbox` only after checking that containment preserves the requested behavior. A local AGY 1.1.2 macOS probe found that `.git` was hidden, so `git status` and `git diff` failed inside the sandbox; installed 1.1.3 has not yet passed a replacement probe. Keep those checks supervisor-owned when possible.
+Add `--sandbox` only after checking that containment preserves the requested behavior. A local AGY 1.1.2 macOS probe found that `.git` was hidden, so `git status` and `git diff` failed inside the sandbox; installed AGY 1.1.4 has not yet passed a replacement probe. Keep those checks supervisor-owned when possible.
 
 ## What `--mode` Means
 
@@ -63,7 +63,7 @@ Community examples often omit `--mode` because they rely on configured defaults 
 
 In headless `-p` mode, an operation that requires `ask` cannot prompt. Current behavior soft-denies the tool and may still return process exit `0` with a notice such as `a tool required the "command" permission that headless mode cannot prompt for`. Classify that notice as `permission`, not success. Use an attended TUI only when the user is available to decide the requested risky action.
 
-Although official docs specify `deny > ask > allow`, a local AGY 1.1.2 probe allowed `git commit --dry-run` when `command(*)` and `command(git commit)` overlapped. The installed 1.1.3 binary has not yet passed a replacement negative probe. Until it does, do not use `command(*)` as the low-friction default. Use exact routine-command grants and audit the shared/project permission sources for stale risky allows.
+Although official docs specify `deny > ask > allow`, a local AGY 1.1.2 probe allowed `git commit --dry-run` when `command(*)` and `command(git commit)` overlapped. The installed AGY 1.1.4 binary has not yet passed a replacement negative probe. Until it does, do not use `command(*)` as the low-friction default. Use exact routine-command grants and audit the shared/project permission sources for stale risky allows.
 
 Set `--print-timeout` above five minutes for builds or broad research.
 

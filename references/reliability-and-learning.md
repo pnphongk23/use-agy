@@ -14,7 +14,7 @@ The default path is `scripts/orchestrate_herdr.py prepare`, which performs the b
 4. Require exit `0` and exact stdout. A model name in logs or a successful OAuth event is not a passing result.
 5. Reuse the passing model for the current session. Recheck after a quota, capacity, adapter, or repeated empty-output failure.
 
-The July 11, 2026 AGY 1.1.2 local evidence showed the implicit/default model path emitting `PlannerResponse without ModifiedResponse` with no usable stdout. Explicitly selecting `Gemini 3.5 Flash (Medium)` then passed both the plain no-tool smoke test and the `--mode plan --sandbox` smoke test. The installed binary is now 1.1.3; retain the explicit-model workaround until the original path passes the documented retirement checks. The workaround is explicit Gemini 3.5 selection, not a cross-family fallback.
+The July 11, 2026 AGY 1.1.2 local evidence showed the implicit/default model path emitting `PlannerResponse without ModifiedResponse` with no usable stdout. Explicitly selecting `Gemini 3.5 Flash (Medium)` then passed both the plain no-tool smoke test and the `--mode plan --sandbox` smoke test. The installed binary was verified as 1.1.4 on 2026-07-21; retain the explicit-model workaround until the original path passes the documented retirement checks on the installed binary. The workaround is explicit Gemini 3.5 selection, not a cross-family fallback.
 
 ## Failure Classes
 
@@ -29,7 +29,7 @@ The July 11, 2026 AGY 1.1.2 local evidence showed the implicit/default model pat
 | `permission` | pending/denied permission, `headless mode cannot prompt`, or an auto-denied required tool | attended TUI for an authorized risky action, or a narrower exact allow rule for a routine action |
 | `sandbox` | `SANDBOX_COMMAND_BLOCKED`, operation-not-permitted, or containment violation | use an authorized in-bound alternative or revise runtime containment without expanding task authority; do not drop sandbox silently |
 | `workspace` | command ran in AGY scratch or reports `not a git repository` outside a sandbox failure | bind the approved root with `--add-dir` and an exact tool working directory |
-| `contract` | process succeeds but output omits or replaces required deliverable | one shorter corrective retry |
+| `contract` | foreground process succeeds but output drifts from the substantive deliverable, or a Herdr stream completes without the raw marker contract | one shorter corrective retry only for foreground/live substantive drift; for completed Herdr streams preserve `malformed_handoff` and do not rerun merely to repair evidence markers, shorten visible output, or recover scrollback |
 | `transient` | network reset, service unavailable, temporary backend error | one bounded retry |
 | `unknown` | evidence does not match a known class | stop after two total attempts and diagnose directly |
 

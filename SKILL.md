@@ -1,11 +1,13 @@
 ---
 name: use-agy
-description: Plan, delegate, coordinate, monitor, and verify work performed by Google Antigravity CLI (`agy`) through a default automated Herdr lifecycle. Use whenever the user mentions agy or Antigravity CLI, asks the agent to act as planner/supervisor while AGY executes, wants an independent local worker for implementation/debugging/research, or needs supervised foreground, TUI, sandbox, conversation, or isolated-worktree execution. The supervisor owns authority, attended-input boundaries, evidence capture, independent verification, and cleanup.
+description: This skill should be used whenever the user mentions agy or Google Antigravity CLI, asks to supervise/delegate work to AGY, requests Herdr/TUI control, foreground agy -p execution, sandboxed AGY work, AGY conversations, isolated AGY worktrees, or AGY verification. External Herdr control requires explicit $use-agy or a Herdr request; a mere AGY mention routes to foreground execution. Handles authority boundaries, work orders, raw handoff capture, independent verification, and cleanup.
 ---
 
 # Use AGY
 
 Act as planner, supervisor, and integrator. Treat AGY as an execution worker. Own task understanding, decomposition, runtime selection, authorization, monitoring, intervention, verification, and final reporting.
+
+This skill handles supervised AGY work: foreground `agy -p`, Herdr-managed attended TUI sessions, work orders, raw handoff capture, evidence review, and cleanup. It does not handle unsupervised external actions, login/consent choices, secret extraction, global permission broadening, commits, pushes, deployments, or recursive AGY edits to this skill's own policy/runtime.
 
 ## Operating Model
 
@@ -16,11 +18,24 @@ understand -> plan -> select worker/runtime -> issue work order
 -> observe -> steer/recover -> verify -> integrate -> report
 ```
 
-AGY performs bounded work; the supervisor remains accountable for the outcome. Use an attended AGY TUI managed by Herdr as this skill's default runtime. Sandbox, conversations, subagents, and worktrees remain mechanisms selected by task needs.
+AGY performs bounded work; the supervisor remains accountable for the outcome. An attended AGY TUI managed by Herdr is the default only when the user explicitly invokes `$use-agy` or explicitly asks for Herdr control. A mere mention of AGY may activate this skill for guidance, but does not authorize external Herdr control; use a foreground AGY process unless the user grants that runtime authority. Sandbox, conversations, subagents, and worktrees remain mechanisms selected by task needs.
+
+## Live Contracts
+
+Use these contracts as current truth:
+
+- Herdr completion evidence is the raw AGY conversation SQLite response selected from the owned job log, not terminal scrollback, visible TUI text, `idle`, or `done`.
+- Terminal reads are bounded diagnostics. They may be empty, wrapped, truncated, or stale; they must never be the handoff channel.
+- The helper writes the extracted raw block to `handoff-<N>.txt`; that file has no line-count limit and grants AGY no write authority.
+- `malformed_handoff` is an evidence/contract failure. Preserve it and stop; do not ask AGY to rerun or rephrase only to repair markers.
+- Corrective retry is only for substantive objective drift before a valid completion contract exists, never for terminal wrapping, missing scrollback, or a finished stream without the raw marker block.
+- `prepare --run-dir` expects a path the helper can create. Pass a nonexistent child under a temp parent, not an already-created directory.
+- Current local binaries must be inspected at runtime. Verified on 2026-07-21: AGY `1.1.4`, Herdr `0.7.3`; older version notes are historical probes, not installed-version claims.
 
 Read only the references needed:
 
 - Read [references/orchestration.md](references/orchestration.md) to decompose tasks, choose foreground/Herdr/TUI/worktree execution, monitor workers, and recover failures.
+- Read [references/herdr-upstream-skill.md](references/herdr-upstream-skill.md) before any Herdr control. It vendors the official [Herdr agent skill](https://github.com/ogulcancelik/herdr/blob/master/SKILL.md), pins the reviewed upstream revision, and defines the external-supervisor adapter rules that take precedence for this skill.
 - Read [references/herdr-runtime.md](references/herdr-runtime.md) before launching, observing, steering, or cleaning up an AGY session in Herdr.
 - Read [references/work-orders.md](references/work-orders.md) to construct prompts, deliverables, acceptance contracts, and retries.
 - Read [references/agy-cli.md](references/agy-cli.md) when exact CLI flags, conversations, models, agents, or version behavior matters.
@@ -30,10 +45,10 @@ Read only the references needed:
 ## Supervisor Rules
 
 1. Understand the user's real outcome and definition of done before delegating.
-2. Default delegated work to an attended Herdr-managed AGY TUI and automate its lifecycle with `scripts/orchestrate_herdr.py`. Use foreground `agy -p` only for the documented exceptions below.
+2. When explicit Herdr authority exists, default delegated work to an attended Herdr-managed AGY TUI and automate its lifecycle with `scripts/orchestrate_herdr.py`. Otherwise use foreground `agy -p`; never infer external terminal-control authority merely because this skill matched an AGY mention.
 3. Do not delegate a task merely because AGY exists. Use direct tools when work is trivial, latency-sensitive, unsafe to delegate, or easier to verify directly.
    Do not ask AGY to modify this skill's own policy or orchestration code; make and verify those changes directly to avoid recursive self-supervision.
-4. Give each AGY invocation one bounded mission with explicit effect authority and evidence-based acceptance checks. Allow broad read-only discovery inside the approved workspace instead of guessing every relevant input path in advance.
+4. Give each AGY invocation one bounded mission with explicit effect authority and evidence-based acceptance checks. Grant broad read permission inside the approved workspace, but start discovery from repository routers, targeted search, relevant code relationships, and nearby tests. Treat file lists and counts as starting context, not read limits.
 5. Separate discovery from mutation when uncertainty or blast radius is meaningful: `EXPLORE/DIAGNOSE -> supervisor review -> EXECUTE -> VERIFY`.
 6. Do not run concurrent writing workers in one checkout. Give each independent writer an isolated worktree and disjoint ownership.
 7. Monitor every live worker. Detect objective drift, permission waits, stalls, timeout, effect-boundary violations, and conflicting edits early.
@@ -72,7 +87,7 @@ Classify each unit of work:
 
 Delegate when AGY offers meaningful independent execution, local tool access, long-running work, or a useful second pass. Work directly when delegation overhead exceeds the task, the task requires supervisor-only judgment, or AGY cannot safely receive the needed context.
 
-Start with Herdr, then check whether a foreground exception applies. Read [references/orchestration.md](references/orchestration.md) for the full lifecycle.
+When explicit Herdr authority exists, start with Herdr and then check whether a foreground exception applies. Without that authority, use foreground execution. Read [references/orchestration.md](references/orchestration.md) for the full lifecycle.
 
 | Need | Preferred topology |
 |---|---|
@@ -94,6 +109,7 @@ Before real work, use the preferred lifecycle helper. `prepare` checks binaries 
 ```bash
 python3 scripts/orchestrate_herdr.py prepare \
   --workspace '<WORKSPACE>' --run-dir '<UNIQUE_RUN_DIR>' \
+  --herdr-authorized \
   --evidence-scope '<PATH_TO_HASH_FOR_BASELINE>'
 ```
 
@@ -108,23 +124,23 @@ The model is healthy only when exit status is zero and normalized stdout is exac
 
 Inspect the effective permission sources without printing unrelated settings or secrets: CLI `settings.json`, shared `userSettings.globalPermissionGrants`, and the selected project config. Remove stale risky allow rules before relying on an `ask` rule. Read [references/security-and-permissions.md](references/security-and-permissions.md) for the verified local profile.
 
-Select broad discovery and least effect authority:
+Select targeted discovery, broad read permission, and least effect authority:
 
 | Job | Mode | Discovery | Effects |
 |---|---|---|---|
-| Research | `plan` | read the approved workspace; activate any installed skill; inspect named primary sources | write none; discovery commands only; network only to named domains |
-| Explore | `plan` | read the entire approved workspace; activate any installed skill; follow code, test, config, and documentation relationships | write none; safe search/inspection commands; normally no network |
-| Diagnose | `plan` | read the entire approved workspace; activate any installed skill; trace and reproduce as needed | write none; named reproduction commands; network only if needed |
-| Execute | `accept-edits` | read the entire approved workspace; activate any installed skill | only named writes, checks, network, and external effects |
-| Verify | `plan` | read the entire approved workspace; activate any installed skill; inspect prior evidence adversarially | write none; named checks; normally no network |
+| Research | `plan` | use repository navigation; follow relevant workspace and installed-skill evidence; inspect named primary sources | write none; discovery commands only; network only to named domains |
+| Explore | `plan` | start targeted; follow relevant code, test, config, documentation, history, and installed-skill relationships | write none; safe search/inspection commands; normally no network |
+| Diagnose | `plan` | start targeted; trace and reproduce through relevant workspace and installed-skill relationships | write none; named reproduction commands; network only if needed |
+| Execute | `accept-edits` | start targeted; follow workspace dependencies and installed skills needed for the change | only named writes, checks, network, and external effects |
+| Verify | `plan` | inspect prior evidence adversarially and follow relevant workspace or installed-skill relationships | write none; named checks; normally no network |
 
-Task specificity comes from the mission, deliverable, acceptance contract, and effect boundary—not from predicting every file AGY may need to read. Allow reads throughout the bound workspace and reads of registered skill bundles. Deny secret stores and unrelated non-workspace paths by runtime policy. A skill may be loaded even when some of its preferred actions are unavailable; AGY must skip unauthorized steps and continue with an in-bound alternative when possible.
+Task specificity comes from the mission, deliverable, acceptance contract, and effect boundary—not from predicting every file AGY may need to read. Broad read permission is an affordance, not an instruction to scan the repository: let evidence determine which additional workspace files or registered skill resources matter. Deny secret stores and unrelated non-workspace paths by runtime policy. A skill may be loaded even when some of its preferred actions are unavailable; AGY must skip unauthorized steps and continue with an in-bound alternative when possible.
 
 `--mode plan` selects AGY's planning/review execution behavior; it is not the same as `--sandbox` and is not, by itself, proof of zero writes. Keep an explicit effect boundary such as `Write: NONE`, plus post-run inspection. Omit `--mode` only when the user explicitly prefers the configured default behavior or a verified CLI incompatibility requires it; do not remove it merely because community examples use auto-approval.
 
-Use the terminal sandbox for untrusted commands, downloaded code, package lifecycle hooks, or network-capable execution. For a trusted repository job that requires Git metadata, either keep `git status`/`git diff` as supervisor-owned checks or omit the sandbox for that bounded run: a local AGY 1.1.2 macOS probe showed that the sandbox hid `.git`; installed 1.1.3 has not yet passed a replacement probe. Never enable `--dangerously-skip-permissions` through this skill. Never accept login, terms, telemetry, or privacy choices for the user.
+Use the terminal sandbox for untrusted commands, downloaded code, package lifecycle hooks, or network-capable execution. For a trusted repository job that requires Git metadata, either keep `git status`/`git diff` as supervisor-owned checks or omit the sandbox for that bounded run: a local AGY 1.1.2 macOS probe showed that the sandbox hid `.git`; installed AGY 1.1.4 has not yet passed a replacement probe. Never enable `--dangerously-skip-permissions` through this skill. Never accept login, terms, telemetry, or privacy choices for the user.
 
-Do not configure `allow: ["command(*)"]` together with narrower risky `ask` rules. A local AGY 1.1.2 negative probe showed `git commit --dry-run` executing despite `ask: ["command(git commit)"]`, and installed 1.1.3 has not yet passed a replacement negative probe. Use explicit allow rules for routine read/search/test commands and leave commit, push, delete, publish, deploy, and system mutation absent from every allow source so they ask in TUI and soft-deny in headless mode.
+Do not configure `allow: ["command(*)"]` together with narrower risky `ask` rules. A local AGY 1.1.2 negative probe showed `git commit --dry-run` executing despite `ask: ["command(git commit)"]`, and installed AGY 1.1.4 has not yet passed a replacement negative probe. Use explicit allow rules for routine read/search/test commands and leave commit, push, delete, publish, deploy, and system mutation absent from every allow source so they ask in TUI and soft-deny in headless mode.
 
 ## 4. Plan The Workforce
 
@@ -141,7 +157,7 @@ Do not ask AGY to orchestrate subagents unless the task genuinely benefits from 
 
 ## 5. Issue The Work Order
 
-Construct the prompt from [references/work-orders.md](references/work-orders.md). Put `JOB`, `MISSION`, and `DELIVERABLE` first. Grant broad workspace discovery and free installed-skill activation, then enumerate write, command, network, MCP, browser, subagent, secret, and external-action effects exhaustively. Include stop conditions, definition of done, and handoff format.
+Construct the prompt from [references/work-orders.md](references/work-orders.md). Put `JOB`, `MISSION`, and `DELIVERABLE` first. Use the canonical repository standard: repository docs are navigation, file lists and counts are starting context, relevant dependencies may be followed, and results require verification. Enumerate write, command, network, MCP, browser, subagent, secret, and external-action effects exhaustively. Include definition of done and the evidence-based handoff fields.
 
 Write the order to a file outside the repository when possible, then launch the default Herdr runtime:
 
@@ -153,7 +169,9 @@ python3 scripts/orchestrate_herdr.py observe \
   --run-dir '<RUN_DIR>' --timeout 600
 ```
 
-Use `--mode accept-edits` only for authorized implementation. Reuse a verified idle same-workspace session with `dispatch`, one bounded work order at a time and only after the prior job was snapshotted and recorded. The helper serializes lifecycle mutations, stores exact pane/terminal ownership, and requires the structured status inside a per-job begin/end marker block so echoed prompt text cannot satisfy the handoff. Exit `20` from `observe` means attended input is required; exit `21` means bounded observation timed out. Neither authorizes automatic input or retry.
+Use `--mode accept-edits` only for authorized implementation. `launch` creates a run-owned Herdr workspace, pins the client/server protocol and socket identity, starts AGY in an explicit returned workspace/tab/pane with `--no-focus`, closes only the verified bootstrap pane, and requires the owned pane to fill the final layout. Reuse a verified idle same-workspace session with `dispatch`, one bounded work order at a time and only after the prior job was snapshotted and recorded. The helper serializes lifecycle mutations and fails fast with owner metadata when another helper already holds the run lock.
+
+Terminal output is progress and diagnostic evidence only. `observe` pins the AGY conversation ID from the owned job log, reads that conversation's SQLite database read-only, and accepts completion only when the raw response contains the exact per-job begin/end marker contract and structured status. It then writes the unwrapped block to helper-owned `handoff-<N>.txt`; this path has no handoff line-count limit and grants AGY no additional write authority. A completed AGY stream without a valid raw block becomes `malformed_handoff` and exits as an orchestration error; terminal wrapping, scrollback, or a visible `idle`/`done` state can never trigger completion or a corrective rerun. Exit `20` means attended input is required and exit `21` means bounded observation timed out. Neither authorizes automatic input or retry.
 
 Foreground exception calls:
 
@@ -179,7 +197,7 @@ When reusing an idle Herdr TUI, deliver the next bounded work order through its 
 
 The lifecycle helper performs dispatch and bounded observation, but the supervisor must read its captured terminal and manifest. It deliberately stops at trust, onboarding, login, consent, or permission prompts. A conversation-scoped permission may be approved only by the user or by the supervisor after verifying that the exact operation is already within the current work order; never create a persistent/global allow rule without explicit user authority.
 
-Intervene when AGY drifts from the mission, stalls, exceeds the effect boundary, requests new authority, edits unexpected files, or reports unverifiable success. Reading an unexpected workspace file or loading an unexpected installed skill is not itself drift. Stop unsafe work immediately. Use one concise corrective retry for a malformed handoff or objective drift; do not loop indefinitely.
+Intervene when AGY drifts from the mission, stalls, exceeds the effect boundary, requests new authority, edits unexpected files, or reports unverifiable success. Reading an unexpected workspace file or loading an unexpected installed skill is not itself drift. Stop unsafe work immediately. A malformed raw handoff is a terminal contract/evidence failure: preserve it and fail fast without rerunning the review or asking AGY to repair markers. One concise corrective retry remains available only for substantive objective drift; do not loop indefinitely.
 
 For empty output, timeout, nonzero exit, or malformed output, run `scripts/classify_run.py` against the log and stdout. Retry by failure class, not by intuition:
 
