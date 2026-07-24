@@ -1,4 +1,4 @@
 interface:
   display_name: "Use AGY"
   short_description: "Automate and supervise AGY through Herdr"
-  default_prompt: "Use $use-agy to give AGY broad workspace discovery and free installed-skill activation, bound all effects to the task, run the default Herdr lifecycle, and independently review every material output claim."
+  default_prompt: "Use $use-agy to give AGY unrestricted installed-skill activation, broad workspace discovery, open mission-bound network/browser access, scoped MCP access, bounded controlled effects, supervised execution, and independent verification."

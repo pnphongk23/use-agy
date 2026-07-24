@@ -14,7 +14,8 @@ Run from the `use-agy` skill directory, or use absolute script paths:
 python3 scripts/orchestrate_herdr.py prepare \
   --workspace '<WORKSPACE>' --run-dir '<RUN_DIR>' \
   --herdr-authorized \
-  --evidence-scope '<PATH_TO_HASH_FOR_BASELINE>'
+  --evidence-scope '<PATH_TO_HASH_FOR_BASELINE>' \
+  --mcp-allow '<SERVER/TOOL>'
 python3 scripts/orchestrate_herdr.py launch \
   --run-dir '<RUN_DIR>' --prompt-file '<ORDER>' --mode plan
 python3 scripts/orchestrate_herdr.py observe \
@@ -25,7 +26,7 @@ python3 scripts/orchestrate_herdr.py record \
 python3 scripts/orchestrate_herdr.py cleanup --run-dir '<RUN_DIR>'
 ```
 
-Use `accept-edits` for an authorized implementation. `--herdr-authorized` is a required assertion that the user explicitly invoked `$use-agy` or requested Herdr; a mere AGY mention is insufficient. `prepare` creates the run directory, selects a healthy Gemini 3.5 model, captures a symlink-safe baseline, and pins the compatible Herdr client version, server version, protocol, socket path, and socket inode identity. It records whether it started the server. `--evidence-scope` controls which existing untracked content is hashed for evidence; it never restricts AGY's read access. The legacy `--scope` spelling remains an alias.
+Use `accept-edits` for an authorized implementation. `--herdr-authorized` is a required assertion that the user explicitly invoked `$use-agy` or requested Herdr; a mere AGY mention is insufficient. `prepare` creates the run directory, selects a healthy Gemini 3.5 model, captures a symlink-safe baseline, and pins the compatible Herdr client version, server version, protocol, socket path, and socket inode identity. It records whether it started the server. The manifest defaults skill loading, network, and browser to `allow`; `--mcp-allow server/tool` or `server/*` is repeatable and leaves unmatched MCP tools at `ask`. It records the exact required runtime allow rules but never mutates settings. Use `--network ask|deny` or `--browser ask|deny` only for a sensitive job. `--evidence-scope` controls which existing untracked content is hashed for evidence; it never restricts AGY's read access. The legacy `--scope` spelling remains an alias.
 
 `launch` creates a run-owned workspace with `--no-focus`, parses its returned workspace/tab/bootstrap-pane IDs, starts AGY by those exact IDs, verifies and closes only the bootstrap pane, and requires the remaining owned pane to fill the workspace. It binds the approved workspace with both Herdr `--cwd` and AGY `--add-dir`. Every later control call revalidates the pinned Herdr runtime and uses the manifest pane ID rather than agent name or UI focus.
 
@@ -33,7 +34,7 @@ Use `accept-edits` for an authorized implementation. `--herdr-authorized` is a r
 
 Lifecycle commands use a fail-fast per-run lock: a competing helper exits `2` with the owning PID and command instead of waiting behind a long `observe`. Terminal diagnostic snapshots are capped independently of handoff size. `dispatch` reuses an owned idle session only after the prior job was recorded, durably marks dispatch pending before sending exactly once, and creates a new per-job baseline. `snapshot` is allowed only after raw handoff capture or an attention state; it will not synthesize a missing handoff from terminal text. After independent verification, `record` preserves `done`, `partial`, or `blocked`. `cleanup` revalidates the runtime and exact workspace/tab/pane/terminal ownership, refuses unexpected panes, closes only the run-owned workspace, and stops a run-started server only when unused; keeping an agent implicitly keeps that server.
 
-The helper never approves trust, onboarding, login, consent, telemetry, privacy, or permissions. Inspect the terminal file before acting on exit `20`. Use manual commands below for diagnosis or recovery, not as the routine path.
+The helper never approves trust, onboarding, login, consent, telemetry, privacy, or permissions. It classifies a prompt for open web/browser or an allowlisted MCP tool as `configuration_mismatch`; other permission prompts remain `new_authority` or `user_attention`. Inspect `attention_detail` and the terminal file before acting on exit `20`. Use manual commands below for diagnosis or recovery, not as the routine path.
 
 If a helper is interrupted, inspect `.orchestration.lock` and the process table before sending a signal. Stop only the exact stale helper PID recorded there; do not stop the owned AGY pane merely to release a helper lock. A stale metadata record without a live lock is harmless and will be replaced by the next lifecycle command.
 
@@ -44,7 +45,7 @@ Before launch:
 1. Run `command -v herdr`, `herdr --version`, `herdr --help`, and `herdr status`. Discover a relevant command group through its non-mutating group help; never run bare `herdr` for discovery and never probe a potentially mutating nested command by omitting required-looking arguments.
 2. Require compatible client/server protocol versions. If no server is running, start a temporary one with `herdr server`; do not enable a login service merely for one job.
 3. Run the normal AGY health gate and select an explicitly healthy Gemini 3.5 tier.
-4. Choose a unique agent name, workspace, log path, effect boundary, monitoring cadence, output-review strategy, and cleanup owner.
+4. Choose a unique agent name, workspace, log path, MCP allowlist, controlled-effect boundary, monitoring cadence, output-review strategy, and cleanup owner.
 5. Inspect `herdr agent list` to avoid reusing an active name.
 6. Capture a workspace baseline appropriate to the job before dispatch. In Git repositories, include status and a tracked-diff hash; if relevant untracked files already exist, hash their in-scope contents too. A status-only snapshot cannot prove that an existing untracked file was unchanged.
 7. Let the helper create an unfocused run-owned workspace and parse every returned workspace/tab/pane/terminal ID as opaque. It inspects the bootstrap layout to choose a usable split, closes the bootstrap only after identity verification, and verifies the final AGY pane occupies the whole workspace. Never synthesize IDs or rely on UI focus.
@@ -69,7 +70,7 @@ herdr agent start 'agy-<job>-<slug>' --cwd '<WORKSPACE>' \
 
 After verifying the returned AGY pane/terminal IDs, close exactly `<BOOTSTRAP_PANE_ID>` and confirm that the AGY pane is the only pane and fills the layout. Routine runs must use the helper instead of this manual sequence.
 
-For authorized edits, use `--mode accept-edits` and the same bounded write, command, network, and verification contract used by foreground execution. Add `--sandbox` only when the command trust boundary needs containment and the requested behavior remains valid inside it. Never pass `--dangerously-skip-permissions`.
+For authorized edits, use `--mode accept-edits` and the same bounded write, command, MCP, external-mutation, and verification contract used by foreground execution. Keep mission-bound network/browser use open. Add `--sandbox` only when the terminal command trust boundary needs containment and the requested behavior remains valid inside it. Never pass `--dangerously-skip-permissions`.
 
 Do not wrap Herdr inside tmux. Herdr cannot inspect an AGY process hidden behind a nested multiplexer.
 

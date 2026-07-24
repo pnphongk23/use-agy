@@ -26,7 +26,7 @@ Before invoking AGY, score the job informally:
 | Verification | one cheap check | multiple checks/manual evidence |
 | Disconnect risk | stable local process | SSH, overnight, laptop workflow |
 
-Use AGY when a worker with a bounded mission and effect envelope can materially reduce time, provide independent evidence, or execute local tooling. Grant broad read-only workspace discovery, but guide the worker to start with repository routers, targeted search, relevant code relationships, and nearby tests. Treat file lists and counts as starting context, not read limits; follow additional workspace dependencies when evidence makes them relevant. Let the worker activate installed skills freely, then judge completion by independent verification rather than by which files it read. Do not use AGY when direct completion is faster, context is too sensitive, the task is an ambiguous product decision, or verification would cost more than doing the work.
+Use AGY when a worker with a bounded mission and controlled-effect envelope can materially reduce time, provide independent evidence, or execute local tooling. Grant broad workspace discovery, unrestricted installed-skill activation, and mission-bound network/browser use. Guide the worker to start with repository routers, targeted search, relevant code relationships, and nearby tests. Treat file lists and counts as starting context, not read limits; follow additional workspace dependencies when evidence makes them relevant. Scope MCP by server/tool, then judge completion by independent verification rather than by which files, skills, or websites the worker used. Do not use AGY when direct completion is faster, context is too sensitive, the task is an ambiguous product decision, or verification would cost more than doing the work.
 
 ## Task Decomposition
 
@@ -110,7 +110,7 @@ Before launch:
 2. Choose a collision-resistant agent name such as `agy-<job>-<slug>` and confirm it is unused.
 3. Set the intended workspace/worktree as session working directory.
 4. Choose a log path that contains no secrets.
-5. Define timeout, poll method, effect-approval strategy, output-review strategy, and cleanup owner.
+5. Define timeout, poll method, MCP scope, controlled-effect approval strategy, output-review strategy, and cleanup owner.
 
 During execution:
 
@@ -167,7 +167,7 @@ Interpret states:
 Intervene when:
 
 - output no longer addresses the mission;
-- writes, commands, secret/non-workspace paths, domains, MCP/browser/subagent calls, or external actions exceed authority;
+- writes, commands, secret/non-workspace paths, unmatched MCP tools, subagent calls, sensitive-data disclosure, or external mutations exceed authority;
 - AGY claims success without evidence;
 - expected output is silent beyond a reasonable task-specific interval;
 - a worker modifies another worker's ownership;

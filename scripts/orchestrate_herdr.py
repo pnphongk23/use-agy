@@ -68,10 +68,114 @@ RAW_STEP_COLUMNS = (
 RAW_STEP_WINDOW = 64
 RAW_HANDOFF_GRACE_SECONDS = 5.0
 MAX_TERMINAL_LINES = 65536
+MCP_GRANT_PATTERN = re.compile(r"^[^/\s()]+/(?:[^/\s()]+|\*)$")
+PERMISSION_REQUEST_PATTERN = re.compile(
+    r"requesting permission for:\s*([^\r\n]+)", re.IGNORECASE
+)
 
 
 class OrchestrationError(RuntimeError):
     pass
+
+
+def capability_profile(args: argparse.Namespace | None = None) -> dict:
+    args = args or argparse.Namespace()
+    mcp_allow = sorted(set(getattr(args, "mcp_allow", []) or []))
+    invalid = [grant for grant in mcp_allow if not MCP_GRANT_PATTERN.fullmatch(grant)]
+    if invalid:
+        raise OrchestrationError(
+            "invalid --mcp-allow value; expected server/tool or server/*: "
+            + ", ".join(invalid)
+        )
+    network = getattr(args, "network", "allow")
+    browser = getattr(args, "browser", "allow")
+    runtime_allow = []
+    if network == "allow" or browser == "allow":
+        runtime_allow.append("read_url(*)")
+    if browser == "allow":
+        runtime_allow.append("execute_url(*)")
+    runtime_allow.extend(f"mcp({grant})" for grant in mcp_allow)
+    return {
+        "schema_version": 1,
+        "skill_loading": {
+            "mode": "allow",
+            "scope": "installed-project-global-and-registered-resources",
+        },
+        "network": {
+            "mode": network,
+            "permission": "read_url(*)",
+        },
+        "browser": {
+            "mode": browser,
+            "permissions": ["read_url(*)", "execute_url(*)"],
+        },
+        "mcp": {
+            "mode": "allowlist",
+            "allow": mcp_allow,
+            "unmatched": "ask",
+        },
+        "runtime_permissions": {
+            "required_allow": runtime_allow,
+            "mutates_settings": False,
+        },
+        "controlled_effects": [
+            "writes",
+            "commands",
+            "subagents",
+            "secrets-and-sensitive-data",
+            "non-workspace-paths",
+            "destructive-actions",
+            "external-mutations",
+        ],
+    }
+
+
+def manifest_capabilities(manifest: dict) -> dict:
+    value = manifest.get("capabilities")
+    return value if isinstance(value, dict) else capability_profile()
+
+
+def capability_contract(capabilities: dict) -> str:
+    network = capabilities.get("network", {}).get("mode", "allow")
+    browser = capabilities.get("browser", {}).get("mode", "allow")
+    mcp = capabilities.get("mcp", {})
+    grants = mcp.get("allow", [])
+    rendered_grants = ", ".join(grants) if grants else "none pre-approved; ask"
+    return (
+        "CAPABILITY CONTRACT: Load installed project/global skills and registered "
+        "skill resources freely. Skill loading is always allowed. "
+        f"Network={network}; browser={browser} within the mission. "
+        f"MCP grants={rendered_grants}; unmatched MCP tools={mcp.get('unmatched', 'ask')}. "
+        "Open network/browser access does not authorize login, consent, secrets, "
+        "sensitive-data disclosure, destructive actions, messages, purchases, "
+        "production changes, or other external mutations."
+    )
+
+
+def mcp_grant_matches(target: str, grants: list[str]) -> bool:
+    if target in grants:
+        return True
+    server, separator, _ = target.partition("/")
+    return bool(separator and f"{server}/*" in grants)
+
+
+def permission_target_status(target: str, capabilities: dict) -> tuple[str, str]:
+    normalized = target.strip().strip("`'\".,")
+    if normalized.startswith("read_url("):
+        allowed = (
+            capabilities.get("network", {}).get("mode") == "allow"
+            or capabilities.get("browser", {}).get("mode") == "allow"
+        )
+        return ("network", "configuration_mismatch" if allowed else "new_authority")
+    if normalized.startswith("execute_url("):
+        allowed = capabilities.get("browser", {}).get("mode") == "allow"
+        return ("browser", "configuration_mismatch" if allowed else "new_authority")
+    if normalized.startswith("mcp(") and normalized.endswith(")"):
+        mcp_target = normalized[4:-1]
+        grants = capabilities.get("mcp", {}).get("allow", [])
+        allowed = mcp_grant_matches(mcp_target, grants)
+        return ("mcp", "configuration_mismatch" if allowed else "new_authority")
+    return ("permission", "new_authority")
 
 
 def utc_now() -> str:
@@ -597,12 +701,36 @@ def read_complete_terminal(
     return read_terminal_capture(manifest, requested, source)[0]
 
 
-def needs_attention(terminal: str) -> str | None:
+def attention_event(terminal: str, capabilities: dict | None = None) -> dict | None:
+    request = PERMISSION_REQUEST_PATTERN.search(terminal)
+    if request:
+        target = request.group(1).strip()
+        kind, classification = permission_target_status(
+            target, capabilities or capability_profile()
+        )
+        return {
+            "reason": "requesting permission for",
+            "kind": kind,
+            "target": target,
+            "classification": classification,
+        }
     lowered = terminal.lower()
     for pattern in ATTENTION_PATTERNS:
         if pattern in lowered:
-            return pattern
+            return {
+                "reason": pattern,
+                "kind": "onboarding-or-auth"
+                if pattern != "allow access to this file"
+                else "file-access",
+                "target": None,
+                "classification": "user_attention",
+            }
     return None
+
+
+def needs_attention(terminal: str) -> str | None:
+    event = attention_event(terminal)
+    return event["reason"] if event else None
 
 
 def handoff_block(terminal: str, token: str) -> str | None:
@@ -744,10 +872,13 @@ def refresh_conversation_identity(run_dir: Path, manifest: dict) -> bool:
     return True
 
 
-def prompt_with_token(prompt: str, token: str) -> str:
+def prompt_with_token(
+    prompt: str, token: str, capabilities: dict | None = None
+) -> str:
     sections = [prompt]
     if REPOSITORY_STANDARD not in prompt:
         sections.append(REPOSITORY_STANDARD)
+    sections.append(capability_contract(capabilities or capability_profile()))
     sections.append(
         "FINAL HANDOFF REQUIREMENT: Return these evidence-based fields: "
         + HANDOFF_FIELDS
@@ -1041,7 +1172,7 @@ def prepare(args: argparse.Namespace) -> int:
         baseline = git_baseline(workspace, evidence_scopes)
         write_json(run_dir / "baseline-1.json", baseline)
         manifest = {
-            "schema_version": 2,
+            "schema_version": 3,
             "created_at": utc_now(),
             "updated_at": utc_now(),
             "phase": "prepared",
@@ -1067,6 +1198,7 @@ def prepare(args: argparse.Namespace) -> int:
                 Path.home() / ".gemini" / "antigravity-cli" / "conversations"
             ),
             "herdr_authorized": True,
+            "capabilities": capability_profile(args),
         }
         save_manifest(run_dir, manifest)
         manifest_durable = True
@@ -1095,7 +1227,7 @@ def launch(args: argparse.Namespace) -> int:
     name = manifest["agent_name"]
     job_log = run_dir / f"job-{manifest['job_sequence']}.log"
     token = uuid.uuid4().hex
-    prompt = prompt_with_token(prompt, token)
+    prompt = prompt_with_token(prompt, token, manifest_capabilities(manifest))
     manifest.update(
         {
             "phase": "launch_pending",
@@ -1261,7 +1393,7 @@ def dispatch(args: argparse.Namespace) -> int:
                 "pane",
                 "run",
                 info["pane_id"],
-                prompt_with_token(prompt, token),
+                prompt_with_token(prompt, token, manifest_capabilities(manifest)),
             ]
         )
     except BaseException:
@@ -1311,15 +1443,22 @@ def observe(args: argparse.Namespace) -> int:
         last_terminal = terminal
         terminal_path.write_text(terminal, encoding="utf-8")
         history_path.write_text(job_terminal, encoding="utf-8")
-        attention = needs_attention(visible)
+        attention = attention_event(visible, manifest_capabilities(manifest))
         if attention:
-            manifest.update({"phase": "attention", "attention": attention})
+            manifest.update(
+                {
+                    "phase": "attention",
+                    "attention": attention["reason"],
+                    "attention_detail": attention,
+                }
+            )
             save_manifest(run_dir, manifest)
             print(
                 json.dumps(
                     {
                         "status": "attention",
-                        "reason": attention,
+                        "reason": attention["reason"],
+                        "attention": attention,
                         "agent_status": info.get("agent_status"),
                         "terminal_file": str(terminal_path),
                     }
@@ -1564,6 +1703,25 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="workspace-relative path to hash for baseline evidence; does not restrict AGY reads",
+    )
+    prepare_parser.add_argument(
+        "--network",
+        choices=("allow", "ask", "deny"),
+        default="allow",
+        help="mission-bound read_url capability; default allow",
+    )
+    prepare_parser.add_argument(
+        "--browser",
+        choices=("allow", "ask", "deny"),
+        default="allow",
+        help="mission-bound execute_url capability; default allow",
+    )
+    prepare_parser.add_argument(
+        "--mcp-allow",
+        action="append",
+        default=[],
+        metavar="SERVER/TOOL",
+        help="allow one MCP server/tool or server/*; repeatable, unmatched tools ask",
     )
     prepare_parser.add_argument("--no-model-fallback", action="store_true")
     prepare_parser.set_defaults(handler=prepare)

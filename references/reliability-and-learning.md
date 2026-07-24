@@ -14,7 +14,7 @@ The default path is `scripts/orchestrate_herdr.py prepare`, which performs the b
 4. Require exit `0` and exact stdout. A model name in logs or a successful OAuth event is not a passing result.
 5. Reuse the passing model for the current session. Recheck after a quota, capacity, adapter, or repeated empty-output failure.
 
-The July 11, 2026 AGY 1.1.2 local evidence showed the implicit/default model path emitting `PlannerResponse without ModifiedResponse` with no usable stdout. Explicitly selecting `Gemini 3.5 Flash (Medium)` then passed both the plain no-tool smoke test and the `--mode plan --sandbox` smoke test. The installed binary was verified as 1.1.4 on 2026-07-21; retain the explicit-model workaround until the original path passes the documented retirement checks on the installed binary. The workaround is explicit Gemini 3.5 selection, not a cross-family fallback.
+The July 11, 2026 AGY 1.1.2 local evidence showed the implicit/default model path emitting `PlannerResponse without ModifiedResponse` with no usable stdout. Explicitly selecting `Gemini 3.5 Flash (Medium)` then passed both the plain no-tool smoke test and the `--mode plan --sandbox` smoke test. The installed binary was verified as 1.1.5 on 2026-07-23; retain the explicit-model workaround until the original path passes the documented retirement checks on the installed binary. The workaround is explicit Gemini 3.5 selection, not a cross-family fallback.
 
 ## Failure Classes
 
@@ -26,7 +26,7 @@ The July 11, 2026 AGY 1.1.2 local evidence showed the implicit/default model pat
 | `quota` | `Resource has been exhausted` or quota error | choose another healthy Gemini 3.5 tier or stop |
 | `capacity` | 503, high traffic, or `No capacity available` | one delayed retry or another healthy Gemini 3.5 tier |
 | `auth` | final failure says not logged in; do not misclassify startup noise if OAuth later succeeds | stop and ask user to authenticate in attended TUI |
-| `permission` | pending/denied permission, `headless mode cannot prompt`, or an auto-denied required tool | attended TUI for an authorized risky action, or a narrower exact allow rule for a routine action |
+| `permission` | pending/denied permission, `headless mode cannot prompt`, or an auto-denied required tool | repair runtime configuration for an already-open web/browser or allowlisted MCP capability; otherwise use attended review for genuinely new authority |
 | `sandbox` | `SANDBOX_COMMAND_BLOCKED`, operation-not-permitted, or containment violation | use an authorized in-bound alternative or revise runtime containment without expanding task authority; do not drop sandbox silently |
 | `workspace` | command ran in AGY scratch or reports `not a git repository` outside a sandbox failure | bind the approved root with `--add-dir` and an exact tool working directory |
 | `contract` | foreground process succeeds but output drifts from the substantive deliverable, or a Herdr stream completes without the raw marker contract | one shorter corrective retry only for foreground/live substantive drift; for completed Herdr streams preserve `malformed_handoff` and do not rerun merely to repair evidence markers, shorten visible output, or recover scrollback |
@@ -37,7 +37,7 @@ Authentication warnings during startup are not decisive. On this installation, l
 
 ## Web And Permission Routing
 
-Headless `-p` is suitable only when required tools can proceed without human approval. Before broad research, run a one-URL web probe with the selected healthy Gemini 3.5 tier. If it waits for approval, switch to an attended TUI; do not use `--dangerously-skip-permissions`. If it returns quota/capacity errors, change only the Gemini 3.5 tier or retry once according to the table.
+Headless `-p` is suitable only when required tools can proceed without human approval. Configure `read_url(*)` and `execute_url(*)` for the open-web baseline, then run a one-URL web probe with the selected healthy Gemini 3.5 tier. Treat an approval wait as a runtime-configuration mismatch, not new task authority. Keep MCP at exact `server/tool` or `server/*` grants and use attended review for unmatched tools. Never use `--dangerously-skip-permissions`. If the probe returns quota/capacity errors, change only the Gemini 3.5 tier or retry once according to the table.
 
 ## Observation Ledger
 

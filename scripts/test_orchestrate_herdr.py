@@ -140,6 +140,104 @@ class OrchestrateHerdrTest(unittest.TestCase):
         )
         self.assertIsNone(orchestration.needs_attention("STATUS: done"))
 
+    def test_default_capabilities_open_skills_network_and_browser(self) -> None:
+        profile = orchestration.capability_profile()
+        self.assertEqual(profile["skill_loading"]["mode"], "allow")
+        self.assertEqual(profile["network"]["mode"], "allow")
+        self.assertEqual(profile["network"]["permission"], "read_url(*)")
+        self.assertEqual(profile["browser"]["mode"], "allow")
+        self.assertIn("execute_url(*)", profile["browser"]["permissions"])
+        self.assertEqual(profile["mcp"]["allow"], [])
+        self.assertEqual(profile["mcp"]["unmatched"], "ask")
+        self.assertEqual(
+            profile["runtime_permissions"]["required_allow"],
+            ["read_url(*)", "execute_url(*)"],
+        )
+        self.assertFalse(profile["runtime_permissions"]["mutates_settings"])
+
+    def test_capabilities_validate_and_sort_mcp_grants(self) -> None:
+        args = argparse.Namespace(
+            network="allow",
+            browser="allow",
+            mcp_allow=["docs/search", "code/*", "docs/search"],
+        )
+        profile = orchestration.capability_profile(args)
+        self.assertEqual(profile["mcp"]["allow"], ["code/*", "docs/search"])
+        self.assertEqual(
+            profile["runtime_permissions"]["required_allow"],
+            [
+                "read_url(*)",
+                "execute_url(*)",
+                "mcp(code/*)",
+                "mcp(docs/search)",
+            ],
+        )
+        with self.assertRaisesRegex(
+            orchestration.OrchestrationError, "expected server/tool"
+        ):
+            orchestration.capability_profile(
+                argparse.Namespace(
+                    network="allow",
+                    browser="allow",
+                    mcp_allow=["mcp(*)"],
+                )
+            )
+
+    def test_permission_attention_classifies_open_web_as_config_mismatch(self) -> None:
+        event = orchestration.attention_event(
+            "Requesting permission for: read_url(example.com)"
+        )
+        self.assertEqual(event["kind"], "network")
+        self.assertEqual(event["classification"], "configuration_mismatch")
+
+        event = orchestration.attention_event(
+            "Requesting permission for: execute_url(example.com)"
+        )
+        self.assertEqual(event["kind"], "browser")
+        self.assertEqual(event["classification"], "configuration_mismatch")
+
+    def test_permission_attention_respects_restricted_web_profile(self) -> None:
+        profile = orchestration.capability_profile(
+            argparse.Namespace(network="ask", browser="deny", mcp_allow=[])
+        )
+        network = orchestration.attention_event(
+            "Requesting permission for: read_url(example.com)", profile
+        )
+        browser = orchestration.attention_event(
+            "Requesting permission for: execute_url(example.com)", profile
+        )
+        self.assertEqual(network["classification"], "new_authority")
+        self.assertEqual(browser["classification"], "new_authority")
+
+        browser_only = orchestration.capability_profile(
+            argparse.Namespace(network="deny", browser="allow", mcp_allow=[])
+        )
+        browser_load = orchestration.attention_event(
+            "Requesting permission for: read_url(example.com)", browser_only
+        )
+        self.assertEqual(browser_load["classification"], "configuration_mismatch")
+
+    def test_permission_attention_scopes_mcp_by_tool_or_server(self) -> None:
+        profile = orchestration.capability_profile(
+            argparse.Namespace(
+                network="allow",
+                browser="allow",
+                mcp_allow=["docs/search", "index/*"],
+            )
+        )
+        exact = orchestration.attention_event(
+            "Requesting permission for: mcp(docs/search)", profile
+        )
+        wildcard = orchestration.attention_event(
+            "Requesting permission for: mcp(index/query)", profile
+        )
+        unmatched = orchestration.attention_event(
+            "Requesting permission for: mcp(database/mutate)", profile
+        )
+        self.assertEqual(exact["classification"], "configuration_mismatch")
+        self.assertEqual(wildcard["classification"], "configuration_mismatch")
+        self.assertEqual(unmatched["classification"], "new_authority")
+
     def test_complete_terminal_read_is_bounded_without_truncation_metadata(self) -> None:
         with mock.patch.object(
             orchestration,
@@ -181,6 +279,9 @@ class OrchestrateHerdrTest(unittest.TestCase):
         prompt = orchestration.prompt_with_token("do work", token)
         self.assertIn(orchestration.REPOSITORY_STANDARD, prompt)
         self.assertIn(orchestration.HANDOFF_FIELDS, prompt)
+        self.assertIn("Skill loading is always allowed", prompt)
+        self.assertIn("Network=allow; browser=allow", prompt)
+        self.assertIn("unmatched MCP tools=ask", prompt)
         self.assertNotIn("120 lines", prompt)
         self.assertNotRegex(prompt, r"(?m)^RUN_TOKEN:\s*abc123\s*$")
         self.assertNotRegex(prompt, r"(?m)^HANDOFF_BEGIN:\s*abc123\s*$")
@@ -451,6 +552,34 @@ class OrchestrateHerdrTest(unittest.TestCase):
             ]
         )
         self.assertEqual(args.evidence_scope, ["legacy", "src"])
+
+    def test_prepare_parser_defaults_to_open_web_and_scoped_mcp(self) -> None:
+        parser = orchestration.build_parser()
+        defaults = parser.parse_args(
+            ["prepare", "--workspace", "/tmp/workspace"]
+        )
+        self.assertEqual(defaults.network, "allow")
+        self.assertEqual(defaults.browser, "allow")
+        self.assertEqual(defaults.mcp_allow, [])
+
+        scoped = parser.parse_args(
+            [
+                "prepare",
+                "--workspace",
+                "/tmp/workspace",
+                "--network",
+                "ask",
+                "--browser",
+                "deny",
+                "--mcp-allow",
+                "docs/search",
+                "--mcp-allow",
+                "index/*",
+            ]
+        )
+        self.assertEqual(scoped.network, "ask")
+        self.assertEqual(scoped.browser, "deny")
+        self.assertEqual(scoped.mcp_allow, ["docs/search", "index/*"])
 
     def test_prepare_requires_explicit_herdr_authority(self) -> None:
         args = argparse.Namespace(herdr_authorized=False, workspace="/tmp")

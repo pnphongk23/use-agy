@@ -4,7 +4,7 @@ Use this reference to select supported CLI behavior. Prefer the installed binary
 
 ## Sources Checked
 
-- Local AGY 1.1.4: `agy --version` checked on 2026-07-21. `agy --help` and `agy changelog` were checked on 2026-07-17. Model, agent, sandbox, workspace, and permission behavior probes noted below were run on 1.1.2 unless stated otherwise.
+- Local AGY 1.1.5: `agy --version` and `agy --help` checked on 2026-07-23. Model, sandbox, workspace, and command-permission probes noted below were run on 1.1.2 unless stated otherwise.
 - Built-in guide: `~/.gemini/antigravity-cli/builtin/skills/antigravity_guide/`.
 - Official docs: `https://antigravity.google/docs/cli-overview`, `/cli-using`, `/cli-best-practices`, `/cli-prompting`, `/cli-reference`, `/cli-conversations`, `/cli-subagents`, `/cli-permissions`, and `/cli-sandbox`.
 
@@ -47,7 +47,7 @@ agy --model 'Gemini 3.5 Flash (Medium)' --add-dir '<WORKSPACE>' -p '<WORK_ORDER>
   --mode plan --print-timeout 10m --log-file '<UNIQUE_LOG>'
 ```
 
-Add `--sandbox` only after checking that containment preserves the requested behavior. A local AGY 1.1.2 macOS probe found that `.git` was hidden, so `git status` and `git diff` failed inside the sandbox; installed AGY 1.1.4 has not yet passed a replacement probe. Keep those checks supervisor-owned when possible.
+Add `--sandbox` only after checking that containment preserves the requested terminal behavior. A local AGY 1.1.2 macOS probe found that `.git` was hidden, so `git status` and `git diff` failed inside the sandbox; installed AGY 1.1.5 has not yet passed a replacement probe. Keep those checks supervisor-owned when possible. Built-in web and browser use do not by themselves require terminal sandboxing.
 
 ## What `--mode` Means
 
@@ -63,7 +63,9 @@ Community examples often omit `--mode` because they rely on configured defaults 
 
 In headless `-p` mode, an operation that requires `ask` cannot prompt. Current behavior soft-denies the tool and may still return process exit `0` with a notice such as `a tool required the "command" permission that headless mode cannot prompt for`. Classify that notice as `permission`, not success. Use an attended TUI only when the user is available to decide the requested risky action.
 
-Although official docs specify `deny > ask > allow`, a local AGY 1.1.2 probe allowed `git commit --dry-run` when `command(*)` and `command(git commit)` overlapped. The installed AGY 1.1.4 binary has not yet passed a replacement negative probe. Until it does, do not use `command(*)` as the low-friction default. Use exact routine-command grants and audit the shared/project permission sources for stale risky allows.
+Although official docs specify `deny > ask > allow`, a local AGY 1.1.2 probe allowed `git commit --dry-run` when `command(*)` and `command(git commit)` overlapped. The installed AGY 1.1.5 binary has not yet passed a replacement negative probe. Until it does, do not use `command(*)` as the low-friction default. Use the expanded exact routine-command profile in [security-and-permissions.md](security-and-permissions.md) and audit the shared/project permission sources for stale risky allows.
+
+Official permissions use `read_url(domain|*)` for fetching/viewing pages, `execute_url(domain|*)` for browser actuation, and `mcp(server/tool)` or `mcp(server/*)` for MCP. This skill's low-friction baseline allows `read_url(*)` and `execute_url(*)` so mission-bound research and browser workflows do not repeatedly ask. Keep MCP scoped; do not use `mcp(*)`. Runtime permission only removes CLI friction and never authorizes login, consent, sensitive-data disclosure, destructive operations, messages, purchases, or external mutation.
 
 Set `--print-timeout` above five minutes for builds or broad research.
 
@@ -92,7 +94,7 @@ These are TUI features, not guaranteed top-level command-line flags. Do not put 
 
 AGY discovers project and global skills and exposes loaded skills through `/skills`. Within this supervisor policy, AGY may activate any installed skill and read its bundled resources without a per-skill approval. Let skills guide broad workspace discovery, including files not named in the original prompt.
 
-Skill activation is not effect authorization. A skill cannot add write, command, network, MCP, browser, subagent, secret, non-workspace, or external-action authority. When a skill's preferred mechanism exceeds the work order, AGY must skip that mechanism and continue with an authorized alternative when possible. Record skills actually used in the handoff for observability; do not make the supervisor ingest the full catalog before launch.
+Skill activation requires no supervisor approval. Let a loaded skill use mission-bound network and browser capabilities. A skill cannot add write, command, MCP scope, subagent, secret, non-workspace, sensitive-data disclosure, or external-mutation authority. When one preferred step exceeds a controlled boundary, skip that step and continue with an authorized alternative when possible. Record skills actually used in the handoff for observability; do not make the supervisor ingest the full catalog before launch.
 
 ## Subagents
 
