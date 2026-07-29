@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "evidence",
+    "changes",
+    "checks",
+    "uncertainty",
+    "next"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "partial", "blocked"]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "changes": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "checks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "uncertainty": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "next": {
+      "type": "string"
+    }
+  }
+}

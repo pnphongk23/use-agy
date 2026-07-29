@@ -1,4 +1,4 @@
 interface:
   display_name: "Use AGY"
-  short_description: "Automate and supervise AGY through Herdr"
-  default_prompt: "Use $use-agy to give AGY unrestricted installed-skill activation, broad workspace discovery, open mission-bound network/browser access, scoped MCP access, bounded controlled effects, supervised execution, and independent verification."
+  short_description: "Stream one AGY with bounded subagents"
+  default_prompt: "Use $use-agy to stream one foreground primary AGY live, allow one useful read-only subagent, validate its structured handoff, and independently verify the result."
