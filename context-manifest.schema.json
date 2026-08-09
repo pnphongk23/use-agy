@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "require_context_receipt",
+    "require_requirement_matrix",
+    "corrective_run",
+    "references",
+    "critical_rules",
+    "requirements"
+  ],
+  "properties": {
+    "require_context_receipt": {"type": "boolean"},
+    "require_requirement_matrix": {"type": "boolean"},
+    "corrective_run": {"type": "boolean"},
+    "native_skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slug", "activation", "version_hash"],
+      "properties": {
+        "slug": {"type": "string", "minLength": 1},
+        "activation": {
+          "type": "string",
+          "enum": ["native-slash", "contract-pack"]
+        },
+        "version_hash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          }
+        }
+      }
+    },
+    "critical_rules": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requirement_id", "role", "required_checks"],
+        "properties": {
+          "requirement_id": {"type": "string", "minLength": 1},
+          "role": {"type": "string", "minLength": 1},
+          "required_checks": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}

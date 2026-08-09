@@ -15,23 +15,26 @@
     {
       "id": 1,
       "prompt": "Cho AGY sửa test đang fail trong đúng một file.",
-      "expected_output": "A fresh accept-edits foreground run with one writable file, exact checks, structured handoff, and independent diff review.",
+      "expected_output": "A fresh accept-edits foreground run with one writable file, exact checks, structured handoff, ordered summary, report.md, and independent diff review.",
       "files": [],
       "assertions": [
         {"id": "foreground", "text": "Uses agy -p directly with the workspace bound by --add-dir"},
         {"id": "permission-bypass", "text": "Uses --dangerously-skip-permissions so authorized headless edits do not soft-deny"},
         {"id": "narrow-write", "text": "Limits writes to the named file and preserves unrelated changes"},
-        {"id": "handoff", "text": "Uses live stream-json and validates the terminal result response against handoff.schema.json"},
+        {"id": "handoff-file", "text": "Writes one handoff.md as the only task source"},
+        {"id": "stream-file", "text": "Uses --output-format stream-json redirected to files and validates structured_output against handoff.schema.json"},
+        {"id": "report", "text": "Materializes report.md from terminal structured_output via the summarize script"},
         {"id": "independent-check", "text": "Reruns the test and inspects the diff instead of trusting AGY"}
       ]
     },
     {
       "id": 2,
       "prompt": "AGY chạy xong exit 0 nhưng chỉ kể quá trình, không có handoff.",
-      "expected_output": "The supervisor treats the run as incomplete despite exit 0 or a missing terminal result and performs at most one focused corrective retry.",
+      "expected_output": "The supervisor treats the run as incomplete despite exit 0 or a missing terminal result/report and performs at most one focused corrective retry.",
       "files": [],
       "assertions": [
         {"id": "exit-not-proof", "text": "Does not treat exit code 0 as completion"},
+        {"id": "missing-report", "text": "Treats missing report.md or invalid structured_output as incomplete"},
         {"id": "one-retry", "text": "Retries at most once for clear contract drift"},
         {"id": "no-loop", "text": "Falls back or reports the blocker after the retry"}
       ]
@@ -39,11 +42,11 @@
     {
       "id": 3,
       "prompt": "AGY báo thành công. Hãy đọc toàn bộ log 20MB rồi kết luận.",
-      "expected_output": "The supervisor skips the full log on a normal success and reads only the handoff, artifacts, diff, and rerun checks.",
+      "expected_output": "The supervisor skips the full log on a normal success and reads only the ordered summary, report, artifacts, diff, and rerun checks.",
       "files": [],
       "assertions": [
         {"id": "no-full-log", "text": "Does not ingest the complete log without failure evidence"},
-        {"id": "artifact-first", "text": "Prioritizes changed files, diff, and independent checks"},
+        {"id": "artifact-first", "text": "Prioritizes ordered summary, report.md, changed files, diff, and independent checks"},
         {"id": "targeted-log", "text": "Uses narrow tail or search excerpts only if evidence conflicts"}
       ]
     },
@@ -75,7 +78,7 @@
       "expected_output": "The supervisor uses --dangerously-skip-permissions in the initial authorized run and still blocks genuinely new authority.",
       "files": [],
       "assertions": [
-        {"id": "soft-deny", "text": "Checks the handoff and targeted diagnostics rather than trusting exit 0"},
+        {"id": "soft-deny", "text": "Checks the handoff/report and targeted diagnostics rather than trusting exit 0"},
         {"id": "runtime-fix", "text": "Includes --dangerously-skip-permissions in the initial authorized local operation"},
         {"id": "no-global-change", "text": "Does not broaden persistent permission settings"},
         {"id": "user-boundary", "text": "Surfaces the exact new authority needed"}
@@ -84,12 +87,16 @@
     {
       "id": 7,
       "prompt": "Task dài 30 phút. Theo dõi AGY nhưng đừng đổ hết log vào context.",
-      "expected_output": "One foreground process is retained while stream-json events are consumed live and summarized compactly.",
+      "expected_output": "One primary AGY process is run via run-agy.py with a short host-tool startup block; compact heartbeats keep Cursor responsive; stuck ACTIVE tools and hard timeout are bounded; stream files are summarized after exit.",
       "files": [],
       "assertions": [
-        {"id": "process-handle", "text": "Keeps and waits on the real foreground process"},
-        {"id": "bounded-monitoring", "text": "Consumes init, compact step updates, subagent metadata, and terminal result events"},
-        {"id": "context-efficient", "text": "Does not redirect stdout to a sink-only file or stream full tool payloads into supervisor context"}
+        {"id": "process-handle", "text": "Runs AGY via the run-agy.py watchdog script and monitors the background task"},
+        {"id": "short-host-block", "text": "Uses a short host-tool startup wait rather than blocking Cursor for the full AGY print timeout"},
+        {"id": "heartbeat", "text": "Uses compact watchdog heartbeats without exposing the prompt or raw event payloads"},
+        {"id": "stalled-tool", "text": "Terminates only the owned process group after a bounded ACTIVE-tool liveness timeout"},
+        {"id": "file-capture", "text": "Redirects stdout and stderr to files via the watchdog script"},
+        {"id": "ordered-summary", "text": "Runs summarize-agy-stream.py and reads the chronological timeline plus report.md"},
+        {"id": "context-efficient", "text": "Does not ingest live NDJSON, full tool payloads, or the full log into supervisor context"}
       ]
     },
     {
@@ -108,14 +115,28 @@
     },
     {
       "id": 9,
-      "prompt": "Chạy AGY với structured output nhưng vẫn theo dõi live, đừng redirect mù vào file.",
-      "expected_output": "The supervisor uses stream-json, consumes compact events live, captures the conversation ID and terminal result, and uses the log only for targeted diagnostics.",
+      "prompt": "Chạy AGY với structured output; ghi stream ra file rồi đọc timeline + report.",
+      "expected_output": "The supervisor uses the run-agy.py watchdog script, redirects stdout/stderr to files, summarizes every event in order, materializes report.md, and uses the log only for targeted diagnostics.",
       "files": [],
       "assertions": [
-        {"id": "stream-json", "text": "Uses --output-format stream-json rather than sink-only json redirection"},
+        {"id": "stream-json", "text": "Uses --output-format stream-json redirected to files via the watchdog script"},
+        {"id": "handoff-md", "text": "Passes the task through one handoff.md file"},
         {"id": "schema", "text": "Uses --json-schema with handoff.schema.json"},
-        {"id": "live-consumer", "text": "Consumes events while the process is running"},
-        {"id": "terminal-result", "text": "Stops waiting after the terminal result and handles a lingering process"}
+        {"id": "ordered-timeline", "text": "Summarize script emits chronological timeline preserving ACTIVE/DONE ordinals"},
+        {"id": "report-md", "text": "Creates report.md from structured_output and treats missing report as incomplete"}
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Review thấy cần sửa lớn trên nhiều file. Resume AGY nếu còn đủ context.",
+      "expected_output": "Supervisor writes corrective-handoff.md and resumes at most once when rule (b) facts allow; otherwise starts fresh; never loops.",
+      "files": [],
+      "assertions": [
+        {"id": "large-fix-agy", "text": "Sends large multi-file or cross-cutting fixes back to AGY instead of silently patching everything"},
+        {"id": "corrective-file", "text": "Uses a separate corrective-handoff.md rather than mutating the original handoff"},
+        {"id": "resume-once", "text": "Resumes with --conversation at most once when resume_hint facts and job state allow"},
+        {"id": "fresh-fallback", "text": "Starts a fresh corrective conversation when resume is not eligible"},
+        {"id": "no-auto-loop", "text": "Does not automatically resume more than once"}
       ]
     }
   ]

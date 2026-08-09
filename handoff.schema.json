@@ -37,6 +37,108 @@
     },
     "next": {
       "type": "string"
+    },
+    "context_receipt": {
+      "$ref": "#/$defs/contextReceipt"
+    },
+    "requirement_matrix": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/requirementRow"}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "contextReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skills_activated", "references_loaded", "critical_rules"],
+      "properties": {
+        "skills_activated": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "version_hash", "activation"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "version_hash": {"$ref": "#/$defs/sha256"},
+              "activation": {
+                "type": "string",
+                "enum": ["native-slash", "contract-pack"]
+              }
+            }
+          }
+        },
+        "references_loaded": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1},
+              "sha256": {"$ref": "#/$defs/sha256"}
+            }
+          }
+        },
+        "critical_rules": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "acceptanceCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "evidence"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "unresolved", "not-applicable"]
+        },
+        "evidence": {"type": "string"}
+      }
+    },
+    "requirementRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requirement_id",
+        "role",
+        "planned_requirement",
+        "resolved_output",
+        "checks",
+        "fallback",
+        "coverage"
+      ],
+      "properties": {
+        "requirement_id": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1},
+        "planned_requirement": {"type": "string", "minLength": 1},
+        "resolved_output": {"type": "string"},
+        "checks": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/acceptanceCheck"}
+        },
+        "fallback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["used", "approved", "description"],
+          "properties": {
+            "used": {"type": "boolean"},
+            "approved": {"type": "boolean"},
+            "description": {"type": "string"}
+          }
+        },
+        "coverage": {
+          "type": "string",
+          "enum": ["pass", "fail", "unresolved"]
+        }
+      }
     }
   }
 }
