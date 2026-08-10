@@ -30,8 +30,6 @@ Every invocation uses a unique `<RUN_DIR>`:
 ```text
 <RUN_DIR>/
   handoff.md
-  domain-contract.md       # only for Skill Bridge runs
-  context-manifest.json    # only for Skill Bridge runs
   events.ndjson
   stderr.txt
   cli.log
@@ -83,7 +81,7 @@ agy -p "/<project-skill-slug>
 $(<"$RUN_DIR/handoff.md")" ...
 ```
 
-Merely mentioning the skill inside the handoff is not activation. For contract fallback, prepend the compiled `DOMAIN CONTRACT` content instead.
+Merely mentioning the skill inside the handoff is not activation. If the native skill is unavailable, embed the necessary task-specific rules directly in `handoff.md` instead of pointing AGY at a separate manifest or receipt protocol.
 
 ## Output Formats (Official)
 
@@ -108,11 +106,8 @@ python3 '<USE_AGY_SKILL>/scripts/summarize-agy-stream.py' \
   --events "$RUN_DIR/events.ndjson" \
   --stderr "$RUN_DIR/stderr.txt" \
   --summary-out "$RUN_DIR/ordered-summary.json" \
-  --report-out "$RUN_DIR/report.md" \
-  --context-manifest "$RUN_DIR/context-manifest.json"
+  --report-out "$RUN_DIR/report.md"
 ```
-
-Omit `--context-manifest` for missions with no external skill/domain contract. When present it is validated against [../context-manifest.schema.json](../context-manifest.schema.json) and makes declared receipt/matrix requirements fail-closed.
 
 Contract:
 
@@ -120,7 +115,6 @@ Contract:
 - emit a chronological `timeline` covering init, every step_update (including ACTIVE and DONE), and the terminal result;
 - truncate large params/output fields in the summary while marking `truncated: true` and original length;
 - materialize exactly one `report.md` from valid terminal `structured_output`;
-- when `--context-manifest` is present, verify exact skill activation/hash, reference hashes, critical-rule receipt, and any required semantic matrix;
 - exit non-zero and refuse a fake success report when the stream/result/handoff is invalid.
 
 Summary fields used by the supervisor:
@@ -133,7 +127,6 @@ Summary fields used by the supervisor:
 - `subagents`
 - `usage`
 - `structured_output` / `response`
-- `context_manifest_applied`
 - `checkpoint_count`
 - `input_tokens`
 - `resume_hint` facts for rule (b)
@@ -168,8 +161,6 @@ Terminal `result` fields used by this skill:
 - `usage` (token accounting, including `cache_read_tokens`)
 
 Exit `0` is not sufficient. Soft-denied tools may still exit `0` with notices on stderr. Missing `report.md` is incomplete.
-
-For a Skill Bridge run, a missing/mismatched receipt, missing declared requirement/check, unapproved fallback, or `done` status with unresolved coverage/checks also makes the summarizer exit non-zero and remove a stale report. `partial`/`blocked` may honestly carry unresolved rows for supervisor review. All role and check semantics come from the project contract; the summarizer does not define domain vocabulary.
 
 ## Resume Heuristic (Rule B)
 

@@ -41,7 +41,7 @@ The preflight checks the installed and latest AGY versions, required headless fl
 6. Allow broad reads inside the approved workspace. Keep writes, commands, secrets, and external effects narrow.
 7. AGY's handoff is a claim, not proof. Verify changed artifacts and checks independently.
 8. Always use `--output-format stream-json` redirected to files. Never consume live NDJSON into supervisor context. Parse every event with the summarize script into an ordered timeline and `report.md`. Do not read the full AGY log on a normal successful run. Do not read thinking/transcript files.
-9. Never write “read skill X” and assume activation. Use the Skill Bridge below, record exact source hashes, require a context receipt, and fail closed when required domain context is unavailable or unverified.
+9. Never write “read skill X” and assume activation. Use native slash activation when available; otherwise embed the necessary task-specific rules directly in the handoff and fail closed when required domain context is unavailable or unverified.
 
 ## References
 
@@ -90,13 +90,13 @@ Always:
 
 If AGY needs an effect outside the work order, it must return `status: blocked`. Exit code `0` does not override a blocked or incomplete handoff. Missing `report.md` means the run is incomplete.
 
-## 3. Build The Skill Bridge And Run Directory
+## 3. Build The Handoff And Run Directory
 
-Use a Skill Bridge whenever the mission depends on a domain skill, its role vocabulary, or external references.
+Keep the task source self-contained in `handoff.md`, even when the mission depends on a domain skill or external references.
 
 ### Capability preflight
 
-Use the preflight output. It verifies AGY `>= 1.1.9`, required flags, the latest published changelog version, and an exact requested skill slug. It never updates AGY or changes plugins. If a requested native skill is absent, compile a run-scoped contract pack. If the full native skill is mandatory and unavailable, return blocked; never silently send an ordinary handoff.
+Use the preflight output. It verifies AGY `>= 1.1.9`, required flags, the latest published changelog version, and an exact requested skill slug. It never updates AGY or changes plugins. If a requested native skill is absent, embed only the necessary project rules directly in `handoff.md`. If the full native skill is mandatory and unavailable, return blocked; never silently send an ordinary handoff.
 
 Native activation:
 
@@ -105,25 +105,22 @@ Native activation:
 <handoff contents>
 ```
 
-Contract-pack fallback:
+Embedded-rules fallback:
 
 ```text
-DOMAIN CONTRACT
-<compiled, task-specific invariants and hashes>
----
-HANDOFF
+PROJECT RULES
+<compiled, task-specific invariants>
+
 <work-order contents>
 ```
 
-The fallback is a contract, not a loose summary. Include applicable invariants, role semantics, approved fallbacks, forbidden substitutions, stop/block conditions, an acceptance matrix, and SHA-256 values for every source skill/reference. The supervisor must read the source skill and required references before compiling it.
+The fallback is still a precise briefing, not a loose summary. Include only the applicable invariants, approved fallbacks, forbidden substitutions, and stop/block conditions AGY actually needs. The supervisor must read the source skill and required references before compiling it.
 
 The preflight creates a unique `<RUN_DIR>` for every invocation:
 
 ```text
 <RUN_DIR>/
-  handoff.md            # single task source written by supervisor
-  domain-contract.md    # when the Skill Bridge is required
-  context-manifest.json # machine-checkable expected skill/reference hashes
+  handoff.md            # single self-contained task source written by supervisor
   events.ndjson         # redirected stream-json
   stderr.txt
   cli.log               # --log-file target
@@ -131,7 +128,7 @@ The preflight creates a unique `<RUN_DIR>` for every invocation:
   report.md             # required terminal report
 ```
 
-Write `<RUN_DIR>/handoff.md` from the work-order template. For a Skill Bridge, place the domain contract in the handoff/invocation payload and write the same expectations to `context-manifest.json`; do not merely point AGY at an unverified skill name. The manifest follows [context-manifest.schema.json](context-manifest.schema.json).
+Write `<RUN_DIR>/handoff.md` from the work-order template. If a native skill is available, start the file with `/<slug>`. Otherwise compile the necessary rules directly into the same file; do not point AGY at an unverified sibling manifest it cannot read.
 
 ## 4. Run One Primary AGY via Watchdog
 
@@ -182,11 +179,8 @@ python3 '<USE_AGY_SKILL>/scripts/summarize-agy-stream.py' \
   --events "$RUN_DIR/events.ndjson" \
   --stderr "$RUN_DIR/stderr.txt" \
   --summary-out "$RUN_DIR/ordered-summary.json" \
-  --report-out "$RUN_DIR/report.md" \
-  --context-manifest "$RUN_DIR/context-manifest.json"
+  --report-out "$RUN_DIR/report.md"
 ```
-
-Omit `--context-manifest` only when no external skill/domain contract is required. When supplied, missing or mismatched receipts/matrices make the summarizer exit non-zero and remove any stale `report.md`.
 
 The script must read every NDJSON line in order, emit `ordered-summary.json` with a chronological `timeline`, and materialize `report.md` from terminal `structured_output`.
 
@@ -221,8 +215,6 @@ Handoff object shape:
 }
 ```
 
-When a Skill Bridge is active, also require `context_receipt`; when the manifest requests semantic traceability, require `requirement_matrix`. The receipt must match the manifest's exact skill slug, activation mechanism, reference paths, hashes, and critical rules. A self-reported receipt is not sufficient proof: verify that the actual invocation began with the slash skill or contained the compiled contract, and inspect relevant ordered timeline reads when the contract pointed to files.
-
 Treat AGY envelope status other than `SUCCESS`, schema failure, missing/empty events, missing `report.md`, permission soft-denial in stderr, or contradiction as incomplete even when the process exits `0`.
 
 ## 7. Verify And Triage
@@ -234,9 +226,9 @@ On a normal successful run, read:
 - the diff;
 - the output of checks rerun by the supervisor.
 
-For work with project-defined semantics, independently compare every matrix row against the canonical project requirement and every named acceptance check declared in `context-manifest.json`. `use-agy` must not define or reinterpret domain roles; their meaning belongs exclusively to the project skill/contract pack.
+For work with project-defined semantics, independently compare AGY's claims against the canonical project requirement and supervisor rerun checks. `use-agy` must not define or reinterpret domain roles; their meaning belongs exclusively to the project skill or the embedded rules compiled into the handoff.
 
-AGY may use only a fallback already approved by the project contract. Failure to satisfy a project-defined check never authorizes silently changing the approved requirement or plan. Return `partial` or `blocked` with the failed/unresolved checks and candidate limitations instead.
+AGY may use only a fallback already approved by the work order. Failure to satisfy a project-defined check never authorizes silently changing the approved requirement or plan. Return `partial` or `blocked` with the failed/unresolved checks and candidate limitations instead.
 
 Validate the file-captured result first. Inspect stderr, conversation, and targeted log excerpts only when:
 
@@ -290,7 +282,7 @@ python3 '<USE_AGY_SKILL>/scripts/run-agy.py' \
 
 Then summarize corrective events into corrective summary/report paths and verify again. Do not loop beyond that single corrective AGY run.
 
-A corrective run must preserve honest requirement coverage. Removing an invalid output may fix one defect while creating a coverage deficit; the result is not `done` until the original requirement is honestly re-covered. Otherwise return `partial` or `blocked` and keep the unresolved row in `requirement_matrix`.
+A corrective run must preserve honest acceptance claims. Removing an invalid output may fix one defect while creating a coverage deficit; the result is not `done` until the original requirement is honestly re-covered. Otherwise return `partial` or `blocked` and say what remains uncovered.
 
 Also allow one retry for transient runtime failure or clear prompt/argument drift under the same goal/authority rules. Do not retry login, consent, secret, or genuinely new-authority blockers.
 
