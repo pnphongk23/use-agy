@@ -57,11 +57,41 @@ The receiving agent has zero context. Include:
 Prepare the handoff in a dedicated workspace:
 
 1. Select the current workspace or call `create_workspace` with the requested isolation.
-2. Call `create_agent` with a `[Handoff] <task>` title, the briefing as initial prompt, and the selected `workspaceId` when explicit placement is needed.
+2. Call `create_agent` with a `[Handoff] <task>` title, the briefing as initial prompt, and the selected `workspaceId` when explicit placement is needed. Keep `notifyOnFinish: true` so the parent receives the completion callback.
 3. Return the agent and workspace to the user, explaining that it remains in your subagent track until they detach it manually.
 
 Do not encode independence as a create mode and do not invoke CLI or wire-level detach operations. Detach is a user gesture in the subagents track.
 
-Leave `notifyOnFinish` omitted unless the user explicitly wants no callback.
+## Completion contract
+
+The receiving agent must end its final response with this exact five-line report. Use one literal status token and keep one field per line:
+
+```text
+status: done
+summary: <what was actually completed>
+artifacts: <files, commits, or none>
+checks: <commands/results, or not run>
+limitations: <remaining uncertainty or none>
+```
+
+`status: done` means every acceptance criterion is verified. Use `status: partial` when the agent returned but one or more criteria remain incomplete or unverifiable. Use `status: blocked` only when the agent cannot continue because of a concrete external blocker (for example, a missing permission or unavailable provider).
+
+The callback is a notification, not proof of success. The parent must inspect the reported artifacts and checks before claiming `done`. If the callback is missing while the agent is still reachable, report `partial` with the agent ID and last known state; use `blocked` only when a concrete provider, permission, or daemon failure prevents progress.
+
+## Optional hierarchy
+
+Use the current agent as **leader**, and only add the following hierarchy when the task benefits from coordination:
+
+```text
+leader
+└── supervisor
+    ├── peer: implementation
+    ├── peer: tests
+    └── peer: review
+```
+
+The supervisor creates its peers with `create_agent` and gathers their reports before replying to the leader. `workspaceId` controls where a child works; it does not change who its parent is. Labels such as `role=supervisor` and `role=peer` are descriptive only and do not grant permissions.
+
+Set `notifyOnFinish: false` only when the user explicitly wants no callback.
 
 Don't wait by default — the user decides whether to follow along or move on. Tell them the agent ID and how to follow along (the paseo skill explains).
